@@ -1,0 +1,10 @@
+{% if config_system == "hydra" -%}
+seed: 42
+epochs: 1
+batch_size: 64
+lr: 0.001
+amp: true
+num_workers: 2
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

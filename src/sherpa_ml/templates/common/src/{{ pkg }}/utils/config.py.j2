@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Tuple
+
+{% if config_system == "hydra" -%}
+from omegaconf import DictConfig, OmegaConf
+{%- endif %}
+
+@dataclass
+class TrainConfig:
+    seed: int
+    dataset: str
+    model: str
+    epochs: int
+    batch_size: int
+    lr: float
+    amp: bool
+    num_workers: int
+
+@dataclass
+class EvalConfig:
+    batch_size: int
+    num_workers: int
+    checkpoint: str | None
+
+def project_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+def load_configs() -> Tuple[TrainConfig, EvalConfig, Dict[str, Any]]:
+    """
+    Returns (train_cfg, eval_cfg, raw_dict) regardless of backend.
+    """
+    {% if config_system == "hydra" -%}
+    # Hydra variant: we assume DictConfig is passed in from @hydra.main
+    raise RuntimeError("Hydra mode: do not call load_configs() directly; call via hydra entry.")
+    {%- else -%}
+    import yaml
+    conf_dir = project_root() / "conf"
+    doc = yaml.safe_load((conf_dir / "config.yaml").read_text())
+    train = doc.get("train", {})
+    eval_ = doc.get("eval", {})
+    tc = TrainConfig(
+        seed=int(train.get("seed", 42)),
+        dataset=str(train.get("dataset", "cifar10")),
+        model=str(train.get("model", "resnet18")),
+        epochs=int(train.get("epochs", 1)),
+        batch_size=int(train.get("batch_size", 64)),
+        lr=float(train.get("lr", 1e-3)),
+        amp=bool(train.get("amp", True)),
+        num_workers=int(train.get("num_workers", 2)),
+    )
+    ec = EvalConfig(
+        batch_size=int(eval_.get("batch_size", 64)),
+        num_workers=int(eval_.get("num_workers", 2)),
+        checkpoint=eval_.get("checkpoint"),
+    )
+    return tc, ec, doc
+    {%- endif %}

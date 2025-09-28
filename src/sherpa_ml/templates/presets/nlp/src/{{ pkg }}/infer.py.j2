@@ -1,0 +1,28 @@
+from __future__ import annotations
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+
+def predict_texts(texts: list[str]) -> list[int]:
+    ckpt_dir = ARTIFACTS_DIR / "hf" / "final"
+    tok = AutoTokenizer.from_pretrained(ckpt_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(ckpt_dir)
+    model.eval()
+    inputs = tok(texts, padding=True, truncation=True, return_tensors="pt")
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    return logits.argmax(dim=1).tolist()
+
+def main() -> None:
+    import argparse, json
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", required=True, help="JSON list of texts")
+    args = ap.parse_args()
+    texts = json.loads(Path(args.json).read_text())
+    preds = predict_texts(texts)
+    log(str(preds))
+
+if __name__ == "__main__":
+    main()

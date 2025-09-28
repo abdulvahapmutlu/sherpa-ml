@@ -1,0 +1,17 @@
+{% if config_system == "plain-yaml" -%}
+train:
+  seed: 42
+  dataset: cifar10
+  model: resnet18
+  epochs: 1
+  batch_size: 64
+  lr: 0.001
+  amp: true
+  num_workers: 2
+eval:
+  batch_size: 64
+  num_workers: 2
+  checkpoint:
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

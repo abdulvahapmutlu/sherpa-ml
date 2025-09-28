@@ -1,0 +1,12 @@
+{% if config_system == "hydra" -%}
+seed: 42
+dataset: sst2     # sst2 | ag_news
+model_name: distilbert-base-uncased
+max_train: 1000   # small for CI speed
+max_eval: 500
+epochs: 1
+batch_size: 16
+lr: 2e-5
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

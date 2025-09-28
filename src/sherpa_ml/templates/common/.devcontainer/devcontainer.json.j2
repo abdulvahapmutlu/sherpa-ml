@@ -1,0 +1,10 @@
+{% if "devcontainer" in extras -%}
+{
+  "name": "{{ repo_name }}",
+  "build": { "dockerfile": "docker/slim.Dockerfile", "context": ".." },
+  "remoteUser": "root",
+  "postCreateCommand": "pip install -e .[dev]"
+}
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

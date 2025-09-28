@@ -1,0 +1,57 @@
+from __future__ import annotations
+from pathlib import Path
+import json
+import joblib
+import numpy as np
+from sklearn.calibration import calibration_curve
+import matplotlib.pyplot as plt
+
+from .data.tabular import load_dataset
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+{% if config_system == "hydra" -%}
+import hydra
+from omegaconf import DictConfig, OmegaConf
+{%- else -%}
+import yaml
+{%- endif %}
+
+def run(cfg) -> None:
+    seed = int(cfg["seed"])
+    csv_path = Path(cfg["dataset_path"])
+    target = str(cfg["target"])
+    test_size = float(cfg["test_size"])
+    bins = int(cfg.get("calibration_bins", 10))
+
+    data = load_dataset(csv_path, target, test_size, seed)
+    ckpt = ARTIFACTS_DIR / "model.joblib"
+    obj = joblib.load(ckpt)
+    model = obj["model"]
+
+    proba = model.predict_proba(data.X_val)[:, 1]
+    frac_pos, mean_pred = calibration_curve(data.y_val, proba, n_bins=bins, strategy="quantile")
+    fig, ax = plt.subplots()
+    ax.plot(mean_pred, frac_pos, marker="o")
+    ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1)
+    ax.set_title("Calibration")
+    ax.set_xlabel("Mean predicted probability")
+    ax.set_ylabel("Fraction of positives")
+    out_png = ARTIFACTS_DIR / "calibration.png"
+    fig.savefig(out_png, bbox_inches="tight")
+    plt.close(fig)
+    log(f"Wrote {out_png}")
+
+{% if config_system == "hydra" -%}
+@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    merged = OmegaConf.merge(cfg.train, cfg.eval)
+    run(OmegaConf.to_object(merged))
+{%- else -%}
+def main() -> None:
+    raw = yaml.safe_load((Path("conf") / "config.yaml").read_text())
+    merged = {**raw["train"], **raw["eval"]}
+    run(merged)
+{%- endif %}
+
+if __name__ == "__main__":
+    main()

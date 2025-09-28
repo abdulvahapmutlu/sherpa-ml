@@ -1,0 +1,9 @@
+def test_smoke_import():
+    __import__("{{ pkg }}")
+
+def test_train_script_runs(tmp_path, monkeypatch):
+    # Ensure artifacts land under project artifacts dir
+    import subprocess, sys, pathlib
+    root = pathlib.Path(__file__).resolve().parents[2]
+    proc = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
+    assert proc.returncode == 0, proc.stderr.decode()

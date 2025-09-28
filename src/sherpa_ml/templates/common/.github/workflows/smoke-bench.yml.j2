@@ -1,0 +1,24 @@
+{% if ci and preset in ['vision','nlp'] -%}
+name: Smoke Bench
+on:
+  workflow_dispatch:
+  pull_request:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e .[dev]
+      - name: Train (1 epoch)
+        run: python -m {{ pkg }}.train
+      - name: Check MLflow
+        if: ${{ "{{ env.MLFLOW_TRACKING_URI != '' " }}}}
+        run: echo "MLflow run expected"
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

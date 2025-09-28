@@ -1,0 +1,68 @@
+{% if "makefile" in extras -%}
+.SHELLFLAGS = -eu -o pipefail -c
+.ONESHELL:
+.DEFAULT_GOAL := help
+
+PY ?= python
+PIP ?= pip
+
+## setup: Create venv, install package + dev deps, install pre-commit if enabled
+setup:
+	$(PY) -m pip install -U pip
+	$(PIP) install -e .[dev]
+{% if "pre-commit" in extras or "ruff+black+mypy" in extras -%}
+	@if command -v pre-commit >/dev/null 2>&1; then pre-commit install; fi
+{%- endif %}
+
+## lint: Run ruff + black checks
+lint:
+	ruff check .
+	black --check .
+
+## fix: Run autoformat (ruff --fix + black)
+fix:
+	ruff check --fix .
+	black .
+
+## type: Run mypy on src/
+type:
+	mypy src
+
+## test: Run unit/integration tests quietly
+test:
+	pytest -q
+
+## train: Run the training script (preset-specific)
+train:
+	$(PY) -m {{ pkg }}.train
+
+## eval: Run the evaluation script
+eval:
+	$(PY) -m {{ pkg }}.eval
+
+## infer: Run the inference CLI (see each preset for args)
+infer:
+	$(PY) -m {{ pkg }}.infer
+
+## serve: Start FastAPI app (if serving enabled)
+serve:
+	uvicorn {{ pkg }}.serve.app:app --host 0.0.0.0 --port 8000
+
+## compose-up: Start MLflow (+ MinIO if enabled) and app
+compose-up:
+	docker compose --env-file .env up -d --build
+
+## compose-down: Stop stack
+compose-down:
+	docker compose down -v
+
+## clean: Remove caches and build artifacts
+clean:
+	rm -rf .mypy_cache .pytest_cache .ruff_cache dist build *.egg-info htmlcov artifacts
+
+## help: Show this help
+help:
+	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\\n"} /^[a-zA-Z0-9_.-]+:.*##/ { printf "  \033[36m%-16s\033[0m %s\\n", $$1, $$2 }' $(MAKEFILE_LIST)
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

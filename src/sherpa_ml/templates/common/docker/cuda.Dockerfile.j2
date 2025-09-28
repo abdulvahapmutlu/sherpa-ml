@@ -1,0 +1,24 @@
+{% if docker_enabled and docker == 'cuda' -%}
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/python3 /usr/bin/python && python -m pip install -U pip
+
+WORKDIR /app
+COPY pyproject.toml README.md /app/
+RUN pip install --no-cache-dir -e .[dev]
+COPY src /app/src
+
+{% if serving -%}
+EXPOSE 8000
+CMD ["uvicorn", "{{ pkg }}.serve.app:app", "--host", "0.0.0.0", "--port", "8000"]
+{% else -%}
+CMD ["python", "-m", "{{ pkg }}.train"]
+{%- endif %}
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

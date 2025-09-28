@@ -1,0 +1,34 @@
+from __future__ import annotations
+from pathlib import Path
+import torch
+from PIL import Image
+import torchvision.transforms as T
+
+from .models.factory import build_model
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+
+def predict_image(img_path: Path, checkpoint: Path | None = None) -> int:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tf = T.Compose([T.Resize((32, 32)), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465),(0.2470,0.2435,0.2616))])
+    x = tf(Image.open(img_path).convert("RGB")).unsqueeze(0).to(device)
+    model = build_model("resnet18", num_classes=10, pretrained=False).to(device)
+    if checkpoint is None:
+        checkpoint = ARTIFACTS_DIR / "checkpoints" / "best.pt"
+    state = torch.load(checkpoint, map_location=device)
+    model.load_state_dict(state["model"])
+    model.eval()
+    y = model(x).argmax(1).item()
+    return int(y)
+
+def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("image", type=str)
+    ap.add_argument("--ckpt", type=str, default=None)
+    args = ap.parse_args()
+    cls = predict_image(Path(args.image), Path(args.ckpt) if args.ckpt else None)
+    log(f"Predicted class: {cls}")
+
+if __name__ == "__main__":
+    main()

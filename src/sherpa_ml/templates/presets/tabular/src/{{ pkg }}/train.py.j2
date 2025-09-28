@@ -1,0 +1,74 @@
+from __future__ import annotations
+from pathlib import Path
+import json
+
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, RocCurveDisplay
+import matplotlib.pyplot as plt
+import joblib
+
+from .data.tabular import load_dataset
+from .models.factory import build_model
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+from .utils.tracking import start_run, log_params, log_metrics, log_artifact
+{% if config_system == "hydra" -%}
+import hydra
+from omegaconf import DictConfig, OmegaConf
+{%- else -%}
+import yaml
+{%- endif %}
+
+def run(cfg) -> None:
+    seed = int(cfg["seed"])
+    csv_path = Path(cfg["dataset_path"])
+    target = str(cfg["target"])
+    test_size = float(cfg["test_size"])
+    model_name = str(cfg["model"])
+    model_cfg = cfg[{"random_forest": "rf", "gradient_boosting": "gb"}[model_name]]
+
+    data = load_dataset(csv_path, target, test_size, seed)
+    model = build_model(model_name, model_cfg)
+    with start_run("train"):
+        log_params({
+            "model": model_name, "n_features": len(data.feature_names),
+            "classes": len(data.classes), "seed": seed
+        })
+        model.fit(data.X_train, data.y_train)
+        proba = model.predict_proba(data.X_val)[:, 1]
+        pred = (proba >= 0.5).astype(int)
+
+        metrics = {
+            "acc": float(accuracy_score(data.y_val, pred)),
+            "f1": float(f1_score(data.y_val, pred)),
+            "auc": float(roc_auc_score(data.y_val, proba)),
+        }
+        log_metrics(metrics)
+
+        # ROC curve artifact
+        fig = RocCurveDisplay.from_predictions(data.y_val, proba).figure_
+        out_png = ARTIFACTS_DIR / "roc_curve.png"
+        fig.savefig(out_png, bbox_inches="tight")
+        plt.close(fig)
+        log_artifact(str(out_png))
+
+        # Persist pipeline
+        ckpt = ARTIFACTS_DIR / "model.joblib"
+        joblib.dump({"model": model, "feature_names": data.feature_names}, ckpt)
+        log_artifact(str(ckpt))
+
+        (ARTIFACTS_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))
+        log("Training complete.")
+
+{% if config_system == "hydra" -%}
+@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    run(OmegaConf.to_object(cfg.train))
+{%- else -%}
+def main() -> None:
+    raw = yaml.safe_load((Path("conf") / "config.yaml").read_text())
+    run(raw["train"])
+{%- endif %}
+
+if __name__ == "__main__":
+    main()

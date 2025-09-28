@@ -1,0 +1,10 @@
+import subprocess, sys, pathlib, json, tempfile
+
+def test_train_and_infer():
+    root = pathlib.Path(__file__).resolve().parents[2]
+    p1 = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
+    assert p1.returncode == 0, p1.stderr.decode()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+    tmp.write(json.dumps(["great movie", "bad acting"]).encode()); tmp.close()
+    p2 = subprocess.run([sys.executable, "-m", "{{ pkg }}.infer", "--json", tmp.name], cwd=root, capture_output=True)
+    assert p2.returncode == 0, p2.stderr.decode()

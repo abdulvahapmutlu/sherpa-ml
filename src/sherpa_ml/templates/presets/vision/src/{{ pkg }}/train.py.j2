@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict
+from pathlib import Path
+from typing import Dict, Tuple
+
+import torch
+from torch import nn
+from torch.optim import Adam
+from torch.cuda.amp import GradScaler, autocast
+from torch.utils.data import DataLoader
+
+from .data.vision import build_dataset, seed_everything
+from .models.factory import build_model
+from .utils.tracking import start_run, log_params, log_metrics, log_artifact
+from .utils.logging import log
+from .utils.paths import ARTIFACTS_DIR
+{% if config_system == "hydra" -%}
+import hydra
+from omegaconf import DictConfig, OmegaConf
+{%- else -%}
+from .utils.config import load_configs, TrainConfig
+{%- endif %}
+
+def accuracy(outputs: torch.Tensor, targets: torch.Tensor) -> float:
+    _, preds = outputs.max(1)
+    return (preds == targets).float().mean().item()
+
+def train_one_epoch(model: nn.Module, loader: DataLoader, device: torch.device, scaler: GradScaler, criterion, optimizer) -> Dict[str, float]:
+    model.train()
+    total_loss, total_acc, n = 0.0, 0.0, 0
+    for x, y in loader:
+        x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
+        optimizer.zero_grad(set_to_none=True)
+        with autocast(enabled=scaler.is_enabled()):
+            logits = model(x)
+            loss = criterion(logits, y)
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        bs = x.size(0)
+        total_loss += loss.item() * bs
+        total_acc += accuracy(logits.detach(), y) * bs
+        n += bs
+    return {"loss": total_loss / n, "acc": total_acc / n}
+
+@torch.no_grad()
+def evaluate(model: nn.Module, loader: DataLoader, device: torch.device, criterion) -> Dict[str, float]:
+    model.eval()
+    total_loss, total_acc, n = 0.0, 0.0, 0
+    for x, y in loader:
+        x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
+        logits = model(x)
+        loss = criterion(logits, y)
+        bs = x.size(0)
+        total_loss += loss.item() * bs
+        total_acc += accuracy(logits, y) * bs
+        n += bs
+    return {"val_loss": total_loss / n, "val_acc": total_acc / n}
+
+def run_train(
+    dataset_name: str,
+    model_name: str,
+    epochs: int,
+    batch_size: int,
+    lr: float,
+    amp: bool,
+    num_workers: int,
+) -> None:
+    seed_everything(42)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data_root = Path.cwd() / "data"
+    data = build_dataset(dataset_name, data_root, batch_size, num_workers, download=True)
+
+    model = build_model(model_name, num_classes=data.num_classes, pretrained=False).to(device)
+    optimizer = Adam(model.parameters(), lr=lr)
+    scaler = GradScaler(enabled=amp)
+    criterion = nn.CrossEntropyLoss()
+
+    best = {"epoch": -1, "val_acc": -1.0}
+    ckpt_dir = ARTIFACTS_DIR / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    with start_run("train"):
+        params = dict(dataset=dataset_name, model=model_name, epochs=epochs, batch_size=batch_size, lr=lr, amp=amp, num_workers=num_workers, device=str(device))
+        log_params(params)
+
+        for epoch in range(1, epochs + 1):
+            tr = train_one_epoch(model, data.train, device, scaler, criterion, optimizer)
+            ev = evaluate(model, data.val, device, criterion)
+            log_metrics({"train_loss": tr["loss"], "train_acc": tr["acc"]}, step=epoch)
+            log_metrics(ev, step=epoch)
+            log(f"Epoch {epoch}: train_acc={tr['acc']:.3f} val_acc={ev['val_acc']:.3f}")
+
+            # Save best
+            if ev["val_acc"] > best["val_acc"]:
+                best.update(epoch=epoch, val_acc=ev["val_acc"])
+                ckpt = ckpt_dir / "best.pt"
+                torch.save({"model": model.state_dict(), "epoch": epoch, "val_acc": ev["val_acc"]}, ckpt)
+                log_artifact(str(ckpt))
+
+        # Save final metrics
+        metrics_path = ARTIFACTS_DIR / "metrics.json"
+        metrics_path.write_text(json.dumps(best, indent=2))
+        log_artifact(str(metrics_path))
+        log(f"Best: epoch={best['epoch']} val_acc={best['val_acc']:.3f}")
+
+{% if config_system == "hydra" -%}
+@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    train_cfg = cfg.train
+    dataset_name = cfg.dataset.name
+    model_name = cfg.model.name
+    run_train(
+        dataset_name=dataset_name,
+        model_name=model_name,
+        epochs=int(train_cfg.epochs),
+        batch_size=int(train_cfg.batch_size),
+        lr=float(train_cfg.lr),
+        amp=bool(train_cfg.amp),
+        num_workers=int(train_cfg.num_workers),
+    )
+{%- else -%}
+def main() -> None:
+    train_cfg, _eval_cfg, _raw = load_configs()
+    run_train(
+        dataset_name=train_cfg.dataset,
+        model_name=train_cfg.model,
+        epochs=train_cfg.epochs,
+        batch_size=train_cfg.batch_size,
+        lr=train_cfg.lr,
+        amp=train_cfg.amp,
+        num_workers=train_cfg.num_workers,
+    )
+{%- endif %}
+
+if __name__ == "__main__":
+    main()

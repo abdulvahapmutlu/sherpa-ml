@@ -1,0 +1,9 @@
+{% if config_system == "hydra" -%}
+name: cifar10
+root: ${oc.env:PWD}/data
+download: true
+image_size: 32
+num_classes: 10
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

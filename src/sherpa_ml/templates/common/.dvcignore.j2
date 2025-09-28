@@ -1,0 +1,7 @@
+{% if "dvc" in extras -%}
+# ignore temporary files under data
+**/.ipynb_checkpoints
+**/*.tmp
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

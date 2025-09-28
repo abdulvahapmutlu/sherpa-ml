@@ -1,0 +1,64 @@
+from __future__ import annotations
+from pathlib import Path
+import torch
+from torch import nn
+
+from .data.vision import build_dataset
+from .models.factory import build_model
+from .utils.logging import log
+from .utils.paths import ARTIFACTS_DIR
+{% if config_system == "hydra" -%}
+import hydra
+from omegaconf import DictConfig
+{%- else -%}
+from .utils.config import load_configs
+{%- endif %}
+
+@torch.no_grad()
+def evaluate_checkpoint(dataset_name: str, model_name: str, checkpoint: Path | None, batch_size: int, num_workers: int) -> None:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data = build_dataset(dataset_name, Path.cwd() / "data", batch_size, num_workers, download=False)
+    model = build_model(model_name, num_classes=data.num_classes, pretrained=False).to(device)
+
+    if checkpoint is None:
+        checkpoint = ARTIFACTS_DIR / "checkpoints" / "best.pt"
+    state = torch.load(checkpoint, map_location=device)
+    model.load_state_dict(state["model"])
+    crit = nn.CrossEntropyLoss()
+
+    total_loss, total_acc, n = 0.0, 0.0, 0
+    for x, y in data.test:
+        x, y = x.to(device), y.to(device)
+        logits = model(x)
+        loss = crit(logits, y)
+        bs = x.size(0)
+        total_loss += loss.item() * bs
+        total_acc += (logits.argmax(1) == y).float().sum().item()
+        n += bs
+
+    log(f"Test: loss={total_loss/n:.4f} acc={total_acc/n:.4f}")
+
+{% if config_system == "hydra" -%}
+@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    evaluate_checkpoint(
+        dataset_name=cfg.dataset.name,
+        model_name=cfg.model.name,
+        checkpoint=Path(cfg.eval.checkpoint) if cfg.eval.checkpoint else None,
+        batch_size=int(cfg.eval.batch_size),
+        num_workers=int(cfg.eval.num_workers),
+    )
+{%- else -%}
+def main() -> None:
+    train_cfg, eval_cfg, _ = load_configs()
+    evaluate_checkpoint(
+        dataset_name=train_cfg.dataset,
+        model_name=train_cfg.model,
+        checkpoint=Path(eval_cfg.checkpoint) if eval_cfg.checkpoint else None,
+        batch_size=eval_cfg.batch_size,
+        num_workers=eval_cfg.num_workers,
+    )
+{%- endif %}
+
+if __name__ == "__main__":
+    main()

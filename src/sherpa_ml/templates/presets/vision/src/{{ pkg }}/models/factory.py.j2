@@ -1,0 +1,21 @@
+from __future__ import annotations
+import torch.nn as nn
+import torchvision.models as tvm
+
+def resnet18(num_classes: int, pretrained: bool = False) -> nn.Module:
+    m = tvm.resnet18(weights=tvm.ResNet18_Weights.DEFAULT if pretrained else None)
+    m.fc = nn.Linear(m.fc.in_features, num_classes)  # type: ignore[attr-defined]
+    return m
+
+def mobilenet_v2(num_classes: int, pretrained: bool = False) -> nn.Module:
+    m = tvm.mobilenet_v2(weights=tvm.MobileNet_V2_Weights.DEFAULT if pretrained else None)
+    m.classifier[-1] = nn.Linear(m.classifier[-1].in_features, num_classes)  # type: ignore[index,attr-defined]
+    return m
+
+def build_model(name: str, num_classes: int, pretrained: bool = False):
+    name = name.lower()
+    if name == "resnet18":
+        return resnet18(num_classes, pretrained)
+    if name == "mobilenetv2":
+        return mobilenet_v2(num_classes, pretrained)
+    raise ValueError(f"Unknown model: {name}")

@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import random
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
+
+import torch
+from torch.utils.data import DataLoader
+import torchvision.transforms as T
+import torchvision.datasets as D
+
+@dataclass
+class VisionData:
+    train: DataLoader
+    val: DataLoader
+    test: DataLoader
+    num_classes: int
+
+def seed_everything(seed: int) -> None:
+    import numpy as np
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+def build_cifar10(root: Path, batch_size: int, num_workers: int, download: bool = True) -> VisionData:
+    normalize = T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+    train_tf = T.Compose([T.RandomCrop(32, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), normalize])
+    test_tf = T.Compose([T.ToTensor(), normalize])
+    train = D.CIFAR10(root=str(root), train=True, transform=train_tf, download=download)
+    test = D.CIFAR10(root=str(root), train=False, transform=test_tf, download=download)
+
+    # Small validation split
+    val_size = 5000
+    train_size = len(train) - val_size
+    train_ds, val_ds = torch.utils.data.random_split(train, [train_size, val_size], generator=torch.Generator().manual_seed(123))
+
+    dl_train = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    dl_val = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
+    dl_test = DataLoader(test, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
+    return VisionData(train=dl_train, val=dl_val, test=dl_test, num_classes=10)
+
+def build_dataset(name: str, data_root: Path, batch_size: int, num_workers: int, download: bool = True) -> VisionData:
+    name = name.lower()
+    if name == "cifar10":
+        return build_cifar10(data_root, batch_size, num_workers, download=download)
+    raise ValueError(f"Unknown dataset: {name}")

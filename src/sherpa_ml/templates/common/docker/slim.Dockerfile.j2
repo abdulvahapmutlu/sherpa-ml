@@ -1,0 +1,23 @@
+{% if docker_enabled and docker == 'slim' -%}
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN useradd -ms /bin/bash appuser
+WORKDIR /app
+
+COPY pyproject.toml README.md /app/
+RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .[dev]
+
+COPY src /app/src
+{% if serving -%}
+EXPOSE 8000
+HEALTHCHECK CMD python -c "import requests; import os; print(requests.get('http://127.0.0.1:8000/health').status_code)" || exit 1
+CMD ["uvicorn", "{{ pkg }}.serve.app:app", "--host", "0.0.0.0", "--port", "8000"]
+{% else -%}
+CMD ["python", "-m", "{{ pkg }}.train"]
+{%- endif %}
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

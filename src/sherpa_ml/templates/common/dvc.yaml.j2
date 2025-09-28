@@ -1,0 +1,9 @@
+{% if "dvc" in extras -%}
+stages:
+  download:
+    cmd: python scripts/download_data.py --out data
+    outs:
+      - data
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

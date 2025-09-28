@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Build
+dist/
+build/
+
+# Local runs / artifacts
+artifacts/
+mlruns/
+runs/
+
+# Generated projects you used for testing
+work/
+
+# OS/editor
+.DS_Store
+Thumbs.db
