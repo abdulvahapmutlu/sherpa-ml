@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -47,11 +49,48 @@ def _warn_illegal(ctx: TemplateContext) -> None:
         console.print(Panel.fit("\n".join(f"• {n}" for n in notes), title="Notes"))
 
 
+def _env_truthy(val: str | None) -> bool | None:
+    """Parse env var strings into booleans; return None if unset."""
+    if val is None:
+        return None
+    v = val.strip().lower()
+    if v in {"1", "true", "yes", "on"}:
+        return True
+    if v in {"0", "false", "no", "off", ""}:
+        return False
+    # default: treat any other non-empty as True
+    return True
+
+
 def _maybe_ask_telemetry() -> None:
-    """Ask once on first run unless overridden via env/flag."""
+    """
+    Decide telemetry without blocking CI:
+
+    Precedence:
+      1) SHERPA_TELEMETRY env (0/1, true/false, etc.)
+      2) Non-interactive (no TTY) -> disable
+      3) First run -> ask interactively
+    """
     cfg = load_config()
     if cfg.client_id:
         return
+
+    # 1) Env override
+    env_enable = _env_truthy(os.getenv("SHERPA_TELEMETRY"))
+    if env_enable is not None:
+        ensure_initialized(enabled=env_enable)
+        return
+
+    # 2) Non-interactive (CI, subprocess without TTY) -> disable silently
+    try:
+        if not sys.stdin.isatty():
+            ensure_initialized(enabled=False)
+            return
+    except Exception:
+        ensure_initialized(enabled=False)
+        return
+
+    # 3) Ask once interactively
     choice = Confirm.ask(
         "[bold]Help improve Sherpa-ML?[/] Send anonymous usage metrics (no code/data/PII).",
         default=False,
@@ -62,7 +101,6 @@ def _maybe_ask_telemetry() -> None:
 def _split_extras(extras_str: str | None) -> list[str]:
     """
     Accept comma- or whitespace-separated extras in a single --extra value.
-
     Examples:
       --extra "dvc,pre-commit"
       --extra "ruff+black+mypy pytest+coverage"
@@ -92,7 +130,9 @@ def _split_extras(extras_str: str | None) -> list[str]:
 @app.command("version")
 def version() -> None:
     """Print Sherpa-ML tool version."""
-    console.print(Panel.fit(f"Sherpa-ML v{tool_version}", title="Version", border_style="cyan"))
+    console.print(
+        Panel.fit(f"Sherpa-ML v{tool_version}", title="Version", border_style="cyan")
+    )
 
 
 @app.command("telemetry")
@@ -103,8 +143,7 @@ def telemetry_cmd(
     show: Annotated[bool, Option("--show", help="Show current telemetry config")] = False,
 ) -> None:
     """
-    Configure or inspect anonymized telemetry.
-    You can also use the env var SHERPA_TELEMETRY=0/1.
+    Configure or inspect anonymized telemetry. You can also use the env var SHERPA_TELEMETRY=0/1.
     """
     if show:
         cfg = load_config()
@@ -142,7 +181,6 @@ def new(
     license_kind: Annotated[
         LicenseKind, Option("--license", help="License identifier", show_default=True)
     ] = LicenseKind.MIT,
-    # NOTE: No `multiple=True` here; we accept a single string and split it ourselves.
     extras: Annotated[
         str | None,
         Option(
@@ -155,20 +193,22 @@ def new(
         ),
     ] = None,
     pkg: Annotated[
-        str | None, Option("--pkg", help="Python package name (default: from repo_name)")
+        str | None, Option("--pkg", help="Python package name (default: derived from repo_name)")
     ] = None,
     plan: Annotated[
         bool, Option("--plan", help="Show what would be rendered without writing files.")
     ] = False,
-    force: Annotated[
-        bool, Option("--force", help="Allow rendering into a non-empty folder.")
-    ] = False,
+    force: Annotated[bool, Option("--force", help="Allow rendering into a non-empty folder.")] = (
+        False
+    ),
     render: Annotated[bool, Option("--render", help="Actually write the files to disk.")] = False,
     telemetry: Annotated[
         bool | None,
         Option(
             "--telemetry/--no-telemetry",
-            help=("Override anonymous telemetry for this run " "(otherwise you'll be asked once)."),
+            help=(
+                "Override anonymous telemetry for this run (otherwise you'll be asked once)."
+            ),
         ),
     ] = None,
 ) -> int:
@@ -182,10 +222,7 @@ def new(
     else:
         ensure_initialized(enabled=telemetry)
 
-    # Derive package name if not provided
     pkg_name = (pkg or repo_name).replace("-", "_").replace(" ", "_").lower()
-
-    # Normalize extras from a single string into a set
     extras_list: list[str] = _split_extras(extras)
     extras_set: set[str] = set(extras_list)
 
@@ -205,13 +242,11 @@ def new(
 
     _warn_illegal(ctx)
 
-    # Pass the parent directory; renderer will create ./<repo_name>
     target = Path.cwd()
     tr = TemplateRenderer()
 
     items = tr.plan(ctx, target)
 
-    # Pretty plan summary
     if plan or not render:
         lines = [f"Will create {len(items)} files under ./{repo_name}"]
         preview_count = min(12, len(items))
@@ -230,7 +265,6 @@ def new(
 
     written = tr.render(ctx, target, force=force)
 
-    # Ensure pyproject.toml exists under ./<repo_name> (extra safety for e2e)
     repo_root = Path.cwd() / repo_name
     py = repo_root / "pyproject.toml"
     if not py.exists():
@@ -246,7 +280,6 @@ def new(
         )
     )
 
-    # Fire-and-forget telemetry event (if enabled)
     send_event(
         {
             "type": "render",
