@@ -247,7 +247,7 @@ Homepage = "https://example.com"
                     "from rich.console import Console\n\n"
                     "_console = Console()\n\n"
                     "def log(msg: str) -> None:\n"
-                    "    _console.print(f\"[bold cyan]{msg}[/]\")\n"
+                    '    _console.print(f"[bold cyan]{msg}[/]")\n'
                 ),
                 encoding="utf-8",
             )
