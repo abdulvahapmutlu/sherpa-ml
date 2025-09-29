@@ -1,5 +1,9 @@
 # Sherpa-ML
 
+[![PyPI version](https://img.shields.io/pypi/v/sherpa-ml?color=blue&label=PyPI&logo=pypi)](https://pypi.org/project/sherpa-ml/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/sherpa-ml.svg?logo=python&logoColor=white)](https://pypi.org/project/sherpa-ml/)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/abdulvahapmutlu/sherpa-ml/release.yml?label=CI&logo=github)](https://github.com/abdulvahapmutlu/sherpa-ml/actions)
+
 **Sherpa-ML** is a scaffolding tool that generates production-ready ML repositories with opinionated presets (vision / tabular / NLP / minimal). It standardizes testing, typing, linting, configs, experiment tracking, Docker, optional serving, and CI — so a single command gives you a repo that **installs, trains, logs, tests, and (optionally) serves** out of the box.
 
 - Consistent skeletons across domains
