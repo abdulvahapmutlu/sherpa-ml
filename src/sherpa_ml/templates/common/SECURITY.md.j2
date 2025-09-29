@@ -1,0 +1,27 @@
+# Security Policy
+
+We take security seriously and appreciate responsible disclosures.
+
+## Reporting a Vulnerability
+
+- Please open a **private** issue with the `security` label **or**
+- Email the maintainers
+
+Include:
+- A clear description of the vulnerability and potential impact
+- Steps to reproduce
+- Any PoC or logs if available
+
+We will acknowledge receipt within a reasonable time frame and work with you on remediation and coordinated disclosure.
+
+## Dependencies & Supply Chain
+
+- Dependencies are pinned in `pyproject.toml`
+{% if ci -%}
+- CI includes optional jobs for `pip-audit` (Python) and `Trivy` (Docker) where applicable
+{%- endif %}
+
+## Secrets & Data
+
+- Do not commit credentials, secrets, or personal data
+- `data/`, `artifacts/`, and `mlruns/` are git-ignored by default

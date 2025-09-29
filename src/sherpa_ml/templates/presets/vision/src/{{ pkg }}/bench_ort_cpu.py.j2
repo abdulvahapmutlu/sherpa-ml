@@ -1,0 +1,26 @@
+from __future__ import annotations
+import time
+from pathlib import Path
+import numpy as np
+import onnxruntime as ort
+
+def main() -> None:
+    onnx_path = Path("artifacts/model.onnx")
+    sess = ort.InferenceSession(onnx_path.as_posix(), providers=["CPUExecutionProvider"])
+    inp = sess.get_inputs()[0].name
+    x = np.random.randn(32, 3, 32, 32).astype(np.float32)
+
+    # Warmup
+    for _ in range(5):
+        _ = sess.run(None, {inp: x})
+
+    iters = 20
+    t0 = time.time()
+    for _ in range(iters):
+        _ = sess.run(None, {inp: x})
+    t = (time.time() - t0) / iters
+    ips = x.shape[0] / t
+    print(f"Avg latency: {t*1000:.2f} ms | Throughput: {ips:.1f} imgs/s")
+
+if __name__ == "__main__":
+    main()

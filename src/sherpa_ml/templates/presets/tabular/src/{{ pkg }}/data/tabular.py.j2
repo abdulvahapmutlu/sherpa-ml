@@ -1,0 +1,41 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+@dataclass
+class TabularData:
+    X_train: np.ndarray
+    X_val: np.ndarray
+    y_train: np.ndarray
+    y_val: np.ndarray
+    feature_names: list[str]
+    classes: list
+
+def ensure_demo_csv(path: Path) -> None:
+    """Create a tiny synthetic binary dataset if file does not exist."""
+    if path.exists():
+        return
+    rng = np.random.default_rng(42)
+    n = 1200
+    X1 = rng.normal(0, 1, size=n)
+    X2 = rng.normal(2, 1, size=n)
+    X3 = rng.normal(-1, 1, size=n)
+    y = (X1 + 0.5 * X2 - 0.8 * X3 + rng.normal(0, 1, size=n) > 0).astype(int)
+    df = pd.DataFrame({"f1": X1, "f2": X2, "f3": X3, "target": y})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+
+def load_dataset(csv_path: Path, target: str, test_size: float, seed: int) -> TabularData:
+    ensure_demo_csv(csv_path)
+    df = pd.read_csv(csv_path)
+    y = df[target].values
+    X = df.drop(columns=[target])
+    feature_names = X.columns.tolist()
+    X_train, X_val, y_train, y_val = train_test_split(X.values, y, test_size=test_size, random_state=seed, stratify=y)
+    classes = sorted(set(y.tolist()))
+    return TabularData(X_train, X_val, y_train, y_val, feature_names, classes)

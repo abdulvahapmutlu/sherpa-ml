@@ -1,0 +1,21 @@
+{% if config_system == "hydra" -%}
+# Root Hydra config (compose below)
+defaults:
+  - dataset: {{ 'cifar10' if preset == 'vision' else 'default' }}
+  - model: {{ 'resnet18' if preset == 'vision' else 'default' }}
+  - train: default
+  - eval: default
+  - _self_
+
+hydra:
+  run:
+    dir: ${oc.env:SHERPA_RUN_DIR, ${oc.env:PWD}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}}
+
+project:
+  name: "{{ repo_name }}"
+  pkg: "{{ pkg }}"
+
+tracking: "{{ tracking }}"
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

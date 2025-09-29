@@ -1,0 +1,5 @@
+{% if config_system == "hydra" -%}
+calibration_bins: 10
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

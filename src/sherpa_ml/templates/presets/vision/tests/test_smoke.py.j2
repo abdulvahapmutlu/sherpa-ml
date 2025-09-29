@@ -1,0 +1,9 @@
+import subprocess, sys, pathlib
+
+def test_import():
+    __import__("{{ pkg }}")
+
+def test_train_fast():
+    root = pathlib.Path(__file__).resolve().parents[2]
+    proc = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
+    assert proc.returncode == 0, proc.stderr.decode()

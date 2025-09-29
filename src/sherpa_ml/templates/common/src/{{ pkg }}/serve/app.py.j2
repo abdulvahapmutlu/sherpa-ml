@@ -1,0 +1,133 @@
+{% if serving -%}
+from __future__ import annotations
+import os, io, base64, json
+from typing import Any, List, Optional
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from .utils.logging import log
+from .utils.paths import ARTIFACTS_DIR
+
+app = FastAPI(title="{{ repo_name }} — Inference API")
+
+# ---- Request schemas per framework
+{% if framework == "pytorch" -%}
+from PIL import Image
+import torch
+import torchvision.transforms as T
+from ..models.factory import build_model
+
+class VisionRequest(BaseModel):
+    images_b64: List[str]  # list of base64-encoded RGB images
+
+_transform = T.Compose([
+    T.Resize((32,32)),
+    T.ToTensor(),
+    T.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616))
+])
+
+_model = None
+_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def _load_vision_model():
+    global _model
+    if _model is not None:
+        return
+    ckpt = ARTIFACTS_DIR / "checkpoints" / "best.pt"
+    if not ckpt.exists():
+        raise RuntimeError("Checkpoint not found; run training first.")
+    state = torch.load(ckpt, map_location=_device)
+    m = build_model("resnet18", num_classes=10, pretrained=False).to(_device)
+    m.load_state_dict(state["model"])
+    m.eval()
+    _model = m
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/infer")
+def infer(req: VisionRequest):
+    _load_vision_model()
+    imgs = []
+    for b in req.images_b64:
+        try:
+            raw = base64.b64decode(b, validate=True)
+            img = Image.open(io.BytesIO(raw)).convert("RGB")
+            imgs.append(_transform(img))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
+    x = torch.stack(imgs).to(_device)
+    with torch.no_grad():
+        logits = _model(x)
+        preds = logits.argmax(1).tolist()
+    return {"preds": preds}
+
+{% elif framework == "sklearn" -%}
+import joblib
+import numpy as np
+
+class TabularRequest(BaseModel):
+    rows: List[dict]
+
+_pipe = None
+
+def _load_pipe():
+    global _pipe
+    if _pipe is not None:
+        return
+    ckpt = ARTIFACTS_DIR / "model.joblib"
+    if not ckpt.exists():
+        raise RuntimeError("Model artifact not found; run training first.")
+    _pipe = joblib.load(ckpt)
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/infer")
+def infer(req: TabularRequest):
+    _load_pipe()
+    feat_names = _pipe["feature_names"]
+    X = np.array([[r.get(f, 0.0) for f in feat_names] for r in req.rows], dtype=float)
+    proba = _pipe["model"].predict_proba(X)[:, 1].tolist()
+    return {"scores": proba}
+
+{% elif framework == "transformers" -%}
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+class NLPRequest(BaseModel):
+    texts: List[str]
+
+_tok = None
+_model = None
+
+def _load_nlp():
+    global _tok, _model
+    if _tok is not None and _model is not None:
+        return
+    ckpt_dir = ARTIFACTS_DIR / "hf" / "final"
+    if not ckpt_dir.exists():
+        raise RuntimeError("HF artifacts not found; run training first.")
+    _tok = AutoTokenizer.from_pretrained(ckpt_dir)
+    _model = AutoModelForSequenceClassification.from_pretrained(ckpt_dir)
+    _model.eval()
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/infer")
+def infer(req: NLPRequest):
+    _load_nlp()
+    inputs = _tok(req.texts, padding=True, truncation=True, return_tensors="pt")
+    with torch.no_grad():
+        logits = _model(**inputs).logits
+    preds = logits.argmax(1).tolist()
+    return {"preds": preds}
+{% endif -%}
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

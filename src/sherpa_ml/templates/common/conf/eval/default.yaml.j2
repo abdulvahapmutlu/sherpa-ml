@@ -1,0 +1,7 @@
+{% if config_system == "hydra" -%}
+batch_size: 64
+num_workers: 2
+checkpoint:
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

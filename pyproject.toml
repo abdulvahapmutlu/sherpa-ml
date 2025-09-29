@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sherpa-ml"
+version = "0.1.2"
+description = "Sherpa-ML: production-grade ML repo scaffolder with presets (vision/tabular/nlp/minimal), Hydra, MLflow, Docker, CI."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+authors = [{ name = "Abdulvahap Mutlu" }]
+license = { text = "MIT" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed"
+]
+dependencies = [
+  "typer>=0.12.3",
+  "jinja2>=3.1.4",
+  "pydantic>=2.8.0",
+  "rich>=13.7.1",
+  "platformdirs>=4.2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+  "mypy>=1.11.0",
+  "ruff>=0.6.5",
+  "black>=24.8.0",
+  "types-setuptools",
+]
+
+[project.scripts]
+sherpa-ml = "sherpa_ml.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/abdulvahapmutlu/sherpa-ml"
+Issues = "https://github.com/abdulvahapmutlu/sherpa-ml/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+# Explicit package discovery for src/ layout
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*", "work*"]
+
+# Include template files in wheels (recursive)
+[tool.setuptools.package-data]
+sherpa_ml = ["templates/**/*"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+no_implicit_optional = true
+check_untyped_defs = true
+plugins = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# E501 handled by black; we can ignore template tree for lint perf
+exclude = ["src/sherpa_ml/templates"]
+[tool.ruff.lint]
+select = ["E","F","I","N","UP","B","A","C4","DTZ","PIE","Q","RUF"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]

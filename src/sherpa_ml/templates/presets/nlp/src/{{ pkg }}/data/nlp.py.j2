@@ -1,0 +1,18 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Tuple
+from datasets import load_dataset
+
+@dataclass
+class NLPData:
+    name: str
+    text_key: str
+    label_key: str
+
+def dataset_card(name: str) -> NLPData:
+    name = name.lower()
+    if name == "sst2":
+        return NLPData("glue", "sentence", "label")
+    if name == "ag_news":
+        return NLPData("ag_news", "text", "label")
+    raise ValueError(f"Unknown dataset: {name}")

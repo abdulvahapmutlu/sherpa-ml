@@ -1,0 +1,27 @@
+from __future__ import annotations
+from pathlib import Path
+import json
+import joblib
+import numpy as np
+
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+
+def predict_rows(rows: list[dict]) -> list[float]:
+    obj = joblib.load(ARTIFACTS_DIR / "model.joblib")
+    model = obj["model"]
+    feature_names = obj["feature_names"]
+    X = np.array([[r.get(f, 0.0) for f in feature_names] for r in rows], dtype=float)
+    return model.predict_proba(X)[:, 1].tolist()
+
+def main() -> None:
+    import argparse, json
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", required=True, help="Path to JSON array of rows")
+    args = ap.parse_args()
+    rows = json.loads(Path(args.json).read_text())
+    scores = predict_rows(rows)
+    log(json.dumps(scores, indent=2))
+
+if __name__ == "__main__":
+    main()

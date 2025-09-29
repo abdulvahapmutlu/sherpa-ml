@@ -1,0 +1,31 @@
+{% if ci -%}
+name: Security
+on:
+  push: { branches: ["main"] }
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"  # weekly
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install -U pip
+          pip install pip-audit -e .
+          pip-audit -r pyproject.toml || true
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          format: table
+          exit-code: "0"
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

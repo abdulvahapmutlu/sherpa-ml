@@ -1,0 +1,6 @@
+{% if config_system == "hydra" -%}
+name: resnet18
+pretrained: false
+{%- else -%}
+{{ SKIP_FILE }}
+{%- endif %}

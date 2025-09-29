@@ -1,0 +1,46 @@
+# Contributing
+
+Thanks for your interest in improving **sherpa-ml**!
+
+## Getting Started
+
+```
+python -m pip install -U pip
+pip install -e .[dev]
+{% if "pre-commit" in extras or "ruff+black+mypy" in extras -%}
+pre-commit install
+{%- endif %}
+pytest -q
+```
+
+## Guidelines
+
+* **Design**: Keep code modular; favor composition over inheritance.
+* **Typing**: mypy strict on `src/`.
+* **Style**: ruff + black (run `make fix` if Makefile is enabled).
+* **Tests**: Add/adjust tests for every change; keep total runtime fast.
+* **Docs**: Update README/model/data cards if behavior changes.
+* **Security**: Do not commit secrets; `data/` and artifacts are ignored by default.
+
+## Commit Messages
+
+Use concise, conventional messages:
+
+```
+feat: add resnet18 pretrained toggle
+fix: handle empty dataset path
+docs: update quickstart
+test: add smoke for onnx export
+chore: bump dependencies
+```
+
+## Pull Request Checklist
+
+* [ ] CI green (lint, type, test)
+* [ ] New/changed behavior is covered by tests
+* [ ] Docs updated (README/model/data cards)
+* [ ] No secrets / data in git
+
+## Code of Conduct
+
+Participation is governed by our **Code of Conduct**.

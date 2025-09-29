@@ -1,0 +1,29 @@
+from __future__ import annotations
+from typing import Any, Dict, Iterable
+
+{% if tracking_mlflow -%}
+import os
+import mlflow
+MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI")
+def start_run(name: str):
+    if MLFLOW_URI:
+        mlflow.set_tracking_uri(MLFLOW_URI)
+    return mlflow.start_run(run_name=name)
+def log_params(params: Dict[str, Any]) -> None:
+    mlflow.log_params({k: (str(v) if not isinstance(v, (int, float, bool)) else v) for k, v in params.items()})
+def log_metrics(metrics: Dict[str, float], step: int | None = None) -> None:
+    mlflow.log_metrics(metrics, step=step)
+def log_artifact(path: str) -> None:
+    mlflow.log_artifact(path)
+{%- else -%}
+from contextlib import contextmanager
+@contextmanager
+def start_run(name: str):
+    yield
+def log_params(params: Dict[str, Any]) -> None:
+    return
+def log_metrics(metrics: Dict[str, float], step: int | None = None) -> None:
+    return
+def log_artifact(path: str) -> None:
+    return
+{%- endif %}

@@ -1,0 +1,15 @@
+from __future__ import annotations
+from pathlib import Path
+from .utils.logging import log
+from .utils.paths import ARTIFACTS_DIR
+
+def main() -> None:
+    log("Eval: reading metrics.json …")
+    p = ARTIFACTS_DIR / "metrics.json"
+    if not p.exists():
+        log("No metrics.json found. Run train first.")
+        return
+    log(p.read_text())
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+from __future__ import annotations
+from pathlib import Path
+
+def main():
+    data = Path("data")
+    data.mkdir(exist_ok=True, parents=True)
+    print("No-op prepare script; customize per preset.")
+
+if __name__ == "__main__":
+    main()

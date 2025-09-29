@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from .utils.logging import log
+from .utils.paths import ARTIFACTS_DIR
+
+{% if tracking_mlflow -%}
+import mlflow
+{%- endif %}
+
+def main() -> None:
+    log("Starting minimal training loop …")
+    metrics = {"loss": 0.123, "accuracy": 0.987, "timestamp": datetime.utcnow().isoformat()}
+    out = ARTIFACTS_DIR / "metrics.json"
+    out.write_text(json.dumps(metrics, indent=2))
+    log(f"Wrote metrics → {out}")
+
+    {% if tracking_mlflow -%}
+    mlflow.set_tracking_uri("{{ '${MLFLOW_TRACKING_URI}' }}")
+    with mlflow.start_run(run_name="minimal"):
+        for k, v in metrics.items():
+            if isinstance(v, (int, float)):
+                mlflow.log_metric(k, float(v))
+            else:
+                mlflow.set_tag(k, str(v))
+        mlflow.log_artifact(str(out))
+        log("Logged metrics to MLflow.")
+    {%- endif %}
+
+if __name__ == "__main__":
+    main()

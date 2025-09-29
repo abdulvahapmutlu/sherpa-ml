@@ -1,0 +1,27 @@
+{% if config_system == "hydra" -%}
+defaults:
+  - train: default
+  - eval: default
+  - _self_
+
+project:
+  name: "{{ repo_name }}"
+  pkg: "{{ pkg }}"
+tracking: "{{ tracking }}"
+
+{% elif config_system == "plain-yaml" -%}
+train:
+  seed: 42
+  dataset: sst2
+  model_name: distilbert-base-uncased
+  max_train: 1000
+  max_eval: 500
+  epochs: 1
+  batch_size: 16
+  lr: 2e-5
+eval:
+  batch_size: 32
+
+{% else -%}
+{{ SKIP_FILE }}
+{% endif %}

@@ -1,0 +1,108 @@
+from __future__ import annotations
+from pathlib import Path
+import numpy as np
+
+from datasets import load_dataset
+from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
+                          DataCollatorWithPadding, TrainingArguments, Trainer)
+from sklearn.metrics import accuracy_score, f1_score
+
+from .data.nlp import dataset_card
+from .utils.paths import ARTIFACTS_DIR
+from .utils.logging import log
+from .utils.tracking import start_run, log_params, log_metrics, log_artifact
+{% if config_system == "hydra" -%}
+import hydra
+from omegaconf import DictConfig, OmegaConf
+{%- else -%}
+import yaml
+{%- endif %}
+
+def metric_fn(pred):
+    y_true = pred.label_ids
+    y_pred = np.argmax(pred.predictions, axis=1)
+    return {"acc": float(accuracy_score(y_true, y_pred)), "f1": float(f1_score(y_true, y_pred, average="macro"))}
+
+def run(cfg) -> None:
+    seed = int(cfg["seed"])
+    ds_name = str(cfg["dataset"])
+    model_name = str(cfg["model_name"])
+    max_train = int(cfg["max_train"])
+    max_eval = int(cfg["max_eval"])
+    epochs = float(cfg["epochs"])
+    batch_size = int(cfg["batch_size"])
+    lr = float(cfg["lr"])
+
+    card = dataset_card(ds_name)
+    if ds_name == "sst2":
+        ds = load_dataset(card.name, "sst2")
+    else:
+        ds = load_dataset(card.name)
+
+    tok = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    def tokenize(examples):
+        return tok(examples[card.text_key], truncation=True)
+    cols = [card.text_key, card.label_key]
+    ds = ds.remove_columns([c for c in ds["train"].column_names if c not in cols]).map(tokenize, batched=True)
+    ds = ds.rename_column(card.label_key, "labels")
+    ds = ds.with_format("torch")
+
+    if max_train > 0:
+        ds["train"] = ds["train"].select(range(min(max_train, len(ds["train"]))))
+    if "validation" in ds and max_eval > 0:
+        ds["validation"] = ds["validation"].select(range(min(max_eval, len(ds["validation"]))))
+    elif "test" in ds and max_eval > 0:
+        ds["test"] = ds["test"].select(range(min(max_eval, len(ds["test"]))))
+
+    num_labels = len(set(ds["train"]["labels"].tolist()))
+    model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
+
+    args = TrainingArguments(
+        output_dir=str(ARTIFACTS_DIR / "hf"),
+        num_train_epochs=epochs,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        learning_rate=lr,
+        evaluation_strategy="steps",
+        eval_steps=50,
+        save_strategy="no",
+        logging_steps=25,
+        report_to=[],
+        seed=seed,
+    )
+
+    collate = DataCollatorWithPadding(tokenizer=tok)
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=ds["train"],
+        eval_dataset=ds.get("validation") or ds.get("test"),
+        tokenizer=tok,
+        data_collator=collate,
+        compute_metrics=metric_fn,
+    )
+
+    with start_run("nlp-train"):
+        log_params({"model": model_name, "dataset": ds_name, "epochs": epochs, "batch_size": batch_size, "lr": lr})
+        trainer.train()
+        res = trainer.evaluate()
+        log_metrics({k: float(v) for k, v in res.items() if isinstance(v, (int, float))})
+        # Save best artifacts
+        save_dir = ARTIFACTS_DIR / "hf" / "final"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(save_dir)
+        tok.save_pretrained(save_dir)
+        log_artifact(str(save_dir))
+
+{% if config_system == "hydra" -%}
+@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    run(OmegaConf.to_object(cfg.train))
+{%- else -%}
+def main() -> None:
+    raw = yaml.safe_load((Path("conf") / "config.yaml").read_text())
+    run(raw["train"])
+{%- endif %}
+
+if __name__ == "__main__":
+    main()
