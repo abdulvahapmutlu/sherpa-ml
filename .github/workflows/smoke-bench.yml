@@ -1,0 +1,38 @@
+name: Smoke (generated repos)
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 1 * * *"
+jobs:
+  e2e-vision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install generator
+        run: |
+          python -m pip install -U pip
+          pip install -e .[dev]
+      - name: Render vision preset
+        run: |
+          mkdir -p work
+          sherpa-ml new work/demo-vision \
+            --preset vision \
+            --framework pytorch \
+            --tracking none \
+            --config hydra \
+            --docker none \
+            --no-ci \
+            --render
+      - name: Test generated repo
+        working-directory: work/demo-vision
+        run: |
+          pip install -e .[dev]
+          pytest -q
+          python -m $(python - <<PY
+import pathlib,sys
+p=sorted(pathlib.Path("src").glob("*"))[0].name
+print(p+".train")
+PY
+)
