@@ -36,7 +36,8 @@ def _warn_illegal(ctx: TemplateContext) -> None:
     notes: list[str] = []
     if ctx.framework == "sklearn" and ctx.serving:
         notes.append(
-            "Serving with sklearn is allowed, but ensure you serialize the pipeline and validate inputs."
+            "Serving with sklearn is allowed, but ensure you serialize the pipeline and "
+            "validate inputs."
         )
     if ctx.docker == "none" and ctx.serving:
         notes.append("Serving selected without Docker; that is fine for local runs.")
@@ -47,9 +48,7 @@ def _warn_illegal(ctx: TemplateContext) -> None:
 
 
 def _maybe_ask_telemetry() -> None:
-    """
-    Ask once on first run unless overridden via env/flag.
-    """
+    """Ask once on first run unless overridden via env/flag."""
     cfg = load_config()
     if cfg.client_id:
         return
@@ -63,6 +62,7 @@ def _maybe_ask_telemetry() -> None:
 def _split_extras(extras_str: str | None) -> list[str]:
     """
     Accept comma- or whitespace-separated extras in a single --extra value.
+
     Examples:
       --extra "dvc,pre-commit"
       --extra "ruff+black+mypy pytest+coverage"
@@ -103,7 +103,8 @@ def telemetry_cmd(
     show: Annotated[bool, Option("--show", help="Show current telemetry config")] = False,
 ) -> None:
     """
-    Configure or inspect anonymized telemetry. You can also use the env var SHERPA_TELEMETRY=0/1.
+    Configure or inspect anonymized telemetry.
+    You can also use the env var SHERPA_TELEMETRY=0/1.
     """
     if show:
         cfg = load_config()
@@ -147,11 +148,14 @@ def new(
         Option(
             "--extra",
             "-e",
-            help="Extras (comma or space separated): dvc, pre-commit, ruff+black+mypy, pytest+coverage, makefile, devcontainer, minio",
+            help=(
+                "Extras (comma or space separated): dvc, pre-commit, ruff+black+mypy, "
+                "pytest+coverage, makefile, devcontainer, minio"
+            ),
         ),
     ] = None,
     pkg: Annotated[
-        str | None, Option("--pkg", help="Python package name (default: derived from repo_name)")
+        str | None, Option("--pkg", help="Python package name (default: from repo_name)")
     ] = None,
     plan: Annotated[
         bool, Option("--plan", help="Show what would be rendered without writing files.")
@@ -164,7 +168,10 @@ def new(
         bool | None,
         Option(
             "--telemetry/--no-telemetry",
-            help="Override anonymous telemetry for this run (otherwise you'll be asked once).",
+            help=(
+                "Override anonymous telemetry for this run "
+                "(otherwise you'll be asked once)."
+            ),
         ),
     ] = None,
 ) -> int:
