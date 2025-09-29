@@ -62,13 +62,41 @@ def _env_truthy(val: str | None) -> bool | None:
     return True
 
 
+def _non_interactive_env() -> bool:
+    """
+    Detect CI / test / automation environments where prompting is unsafe.
+    Works across Linux/macOS/Windows runners.
+    """
+    e = os.environ
+    if e.get("CI") or e.get("GITHUB_ACTIONS") or e.get("PYTEST_CURRENT_TEST"):
+        return True
+    return False
+
+
+def _any_stream_not_tty() -> bool:
+    """
+    Return True if any std stream is missing or not a TTY.
+    On Windows runners, subprocess capture can cause this even if stdin looks TTY-like.
+    """
+    try:
+        streams = (sys.stdin, sys.stdout, sys.stderr)
+        for s in streams:
+            if s is None:
+                return True
+            if not s.isatty():
+                return True
+        return False
+    except Exception:
+        return True
+
+
 def _maybe_ask_telemetry() -> None:
     """
-    Decide telemetry without blocking CI:
+    Decide telemetry without blocking CI.
 
     Precedence:
       1) SHERPA_TELEMETRY env (0/1, true/false, etc.)
-      2) Non-interactive (no TTY) -> disable
+      2) CI/test/non-interactive (any stream not TTY OR CI/GHA/pytest env) -> disable
       3) First run -> ask interactively
     """
     cfg = load_config()
@@ -81,12 +109,8 @@ def _maybe_ask_telemetry() -> None:
         ensure_initialized(enabled=env_enable)
         return
 
-    # 2) Non-interactive (CI, subprocess without TTY) -> disable silently
-    try:
-        if not sys.stdin.isatty():
-            ensure_initialized(enabled=False)
-            return
-    except Exception:
+    # 2) Non-interactive by environment or streams -> disable silently
+    if _non_interactive_env() or _any_stream_not_tty():
         ensure_initialized(enabled=False)
         return
 
