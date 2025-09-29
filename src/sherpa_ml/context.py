@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, model_validator
 # ------------------------------------------------------------------------------
 # Public enums (cli.py imports these)
 # ------------------------------------------------------------------------------
-
 class Preset(str, Enum):
     vision = "vision"
     tabular = "tabular"
@@ -18,8 +17,8 @@ class Preset(str, Enum):
 
 
 class Framework(str, Enum):
-    pytorch = "pytorch"          # vision
-    sklearn = "sklearn"          # tabular
+    pytorch = "pytorch"  # vision
+    sklearn = "sklearn"  # tabular
     transformers = "transformers"  # nlp
 
 
@@ -47,7 +46,6 @@ class LicenseKind(str, Enum):
 # ------------------------------------------------------------------------------
 # Context model (render-time contract with templates)
 # ------------------------------------------------------------------------------
-
 class TemplateContext(BaseModel):
     repo_name: str
     pkg: str
