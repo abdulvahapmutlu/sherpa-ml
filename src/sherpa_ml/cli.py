@@ -168,10 +168,7 @@ def new(
         bool | None,
         Option(
             "--telemetry/--no-telemetry",
-            help=(
-                "Override anonymous telemetry for this run "
-                "(otherwise you'll be asked once)."
-            ),
+            help=("Override anonymous telemetry for this run " "(otherwise you'll be asked once)."),
         ),
     ] = None,
 ) -> int:

@@ -15,6 +15,7 @@ SKIP_SENTINEL = "__SHERPA_SKIP_FILE__"
 @dataclass(frozen=True)
 class PlanItem:
     """Planned output artifact."""
+
     src_rel: Path  # path relative to templates root
     dst_rel: Path  # path relative to destination repo root
     is_template: bool
@@ -62,9 +63,7 @@ class TemplateRenderer:
         """Return the list of PlanItem objects describing what would be written."""
         return list(self._build_plan(ctx))
 
-    def render(
-        self, ctx: TemplateContext, dest_root: Path, *, force: bool = False
-    ) -> list[Path]:
+    def render(self, ctx: TemplateContext, dest_root: Path, *, force: bool = False) -> list[Path]:
         """
         Materialize the plan to disk and return destination-relative paths that were written.
 
@@ -268,9 +267,7 @@ Homepage = "https://example.com"
             written.append(train_py.relative_to(dest_repo_root))
 
     @staticmethod
-    def _ensure_docker(
-        ctx: TemplateContext, dest_repo_root: Path, written: list[Path]
-    ) -> None:
+    def _ensure_docker(ctx: TemplateContext, dest_repo_root: Path, written: list[Path]) -> None:
         """
         Ensure a minimal Dockerfile exists if docker != 'none'. This is a fallback used when
         templates don't provide one for the selected preset/flavor.
