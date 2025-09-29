@@ -37,8 +37,10 @@ class TemplateRenderer:
 
     Post-conditions:
       - Ensure `pyproject.toml` exists and uses src-layout.
-      - Ensure `src/<pkg>/__init__.py`, `src/<pkg>/utils/logging.py`, and `src/<pkg>/train.py` exist.
-      - If `ctx.docker != "none"`, ensure a minimal `docker/Dockerfile` exists (fallback).
+      - Ensure `src/<pkg>/__init__.py`, `src/<pkg>/utils/logging.py`, and
+        `src/<pkg>/train.py` exist.
+      - If `ctx.docker != "none"`, ensure a minimal `docker/Dockerfile`
+        exists (fallback).
     """
 
     def __init__(self) -> None:
@@ -60,7 +62,9 @@ class TemplateRenderer:
         """Return the list of PlanItem objects describing what would be written."""
         return list(self._build_plan(ctx))
 
-    def render(self, ctx: TemplateContext, dest_root: Path, *, force: bool = False) -> list[Path]:
+    def render(
+        self, ctx: TemplateContext, dest_root: Path, *, force: bool = False
+    ) -> list[Path]:
         """
         Materialize the plan to disk and return destination-relative paths that were written.
 
@@ -140,9 +144,9 @@ class TemplateRenderer:
     def _map_src_to_dst(self, src_rel: Path, ctx: TemplateContext) -> Path | None:
         """
         Convert a path like:
-          common/.env.example.j2                 -> .env.example.j2
+          common/.env.example.j2                  -> .env.example.j2
           presets/vision/src/{{ pkg }}/eval.py.j2 -> src/{{ pkg }}/eval.py.j2
-          presets/<other>/...                    -> None (skipped when preset != selected)
+          presets/<other>/...                     -> None (preset mismatch)
         """
         parts = src_rel.parts
         if not parts:
@@ -169,14 +173,12 @@ class TemplateRenderer:
 
     def _render_relpath(self, rel: str, ctx: TemplateContext) -> str:
         """Render Jinja variables inside path segments (e.g., {{ pkg }})."""
-        # Use a tiny Jinja template compiled from the string itself
         t = self.env.from_string(rel)
         rendered = t.render(**ctx.as_jinja())
-        # Normalize to POSIX separators for portability; we'll cast back to Path later
         return str(PurePosixPath(rendered))
 
     def _render_text(self, src_rel: Path, ctx: TemplateContext) -> str:
-        """Render a single Jinja template referred to by its path relative to the templates root."""
+        """Render a template referred to by path relative to the templates root."""
         tpl_name = str(src_rel.as_posix())
         try:
             tpl = self.env.get_template(tpl_name)
@@ -220,8 +222,9 @@ Homepage = "https://example.com"
         ctx: TemplateContext, dest_repo_root: Path, written: list[Path]
     ) -> None:
         """
-        Create a minimal src/<pkg>/ package with __init__.py, utils/logging.py, and train.py if missing.
-        Makes the generated repo importable and satisfies e2e tests that look for train.py.
+        Create a minimal src/<pkg>/ package with __init__.py, utils/logging.py, and
+        train.py if missing. Makes the generated repo importable and satisfies e2e tests
+        that look for train.py.
         """
         pkg = ctx.pkg or ctx.repo_name.replace("-", "_")
         pkg_dir = dest_repo_root / "src" / pkg
@@ -240,8 +243,12 @@ Homepage = "https://example.com"
         logging_py = utils_dir / "logging.py"
         if not logging_py.exists():
             logging_py.write_text(
-                "from rich.console import Console\n\n_console = Console()\n\ndef log(msg: str) -> None:\n"
-                '    _console.print(f"[bold cyan]{msg}[/]")\n',
+                (
+                    "from rich.console import Console\n\n"
+                    "_console = Console()\n\n"
+                    "def log(msg: str) -> None:\n"
+                    "    _console.print(f\"[bold cyan]{msg}[/]\")\n"
+                ),
                 encoding="utf-8",
             )
             written.append(logging_py.relative_to(dest_repo_root))
@@ -249,9 +256,13 @@ Homepage = "https://example.com"
         train_py = pkg_dir / "train.py"
         if not train_py.exists():
             train_py.write_text(
-                "from .utils.logging import log\n\n\ndef main() -> None:\n"
-                "    log('hello from train()')\n\n\nif __name__ == '__main__':\n"
-                "    main()\n",
+                (
+                    "from .utils.logging import log\n\n"
+                    "def main() -> None:\n"
+                    "    log('hello from train()')\n\n"
+                    "if __name__ == '__main__':\n"
+                    "    main()\n"
+                ),
                 encoding="utf-8",
             )
             written.append(train_py.relative_to(dest_repo_root))
