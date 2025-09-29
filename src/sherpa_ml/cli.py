@@ -130,9 +130,7 @@ def _split_extras(extras_str: str | None) -> list[str]:
 @app.command("version")
 def version() -> None:
     """Print Sherpa-ML tool version."""
-    console.print(
-        Panel.fit(f"Sherpa-ML v{tool_version}", title="Version", border_style="cyan")
-    )
+    console.print(Panel.fit(f"Sherpa-ML v{tool_version}", title="Version", border_style="cyan"))
 
 
 @app.command("telemetry")
@@ -206,9 +204,7 @@ def new(
         bool | None,
         Option(
             "--telemetry/--no-telemetry",
-            help=(
-                "Override anonymous telemetry for this run (otherwise you'll be asked once)."
-            ),
+            help=("Override anonymous telemetry for this run (otherwise you'll be asked once)."),
         ),
     ] = None,
 ) -> int:
