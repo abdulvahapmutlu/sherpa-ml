@@ -18,8 +18,8 @@ class Preset(str, Enum):
 
 
 class Framework(str, Enum):
-    pytorch = "pytorch"         # vision
-    sklearn = "sklearn"         # tabular
+    pytorch = "pytorch"          # vision
+    sklearn = "sklearn"          # tabular
     transformers = "transformers"  # nlp
 
 
@@ -62,19 +62,21 @@ class TemplateContext(BaseModel):
     ci: bool = True
     license: LicenseKind = LicenseKind.MIT
 
-    # Extras: e.g., {"pre-commit","ruff+black+mypy","pytest+coverage","makefile","devcontainer","dvc","minio"}
+    # Example extras:
+    # {"pre-commit","ruff+black+mypy","pytest+coverage","makefile","devcontainer","dvc","minio"}
     extras: set[str] = Field(default_factory=set)
 
     # ---------- Validators ----------
 
     @model_validator(mode="after")
-    def _validate_framework_vs_preset(self) -> "TemplateContext":
+    def _validate_framework_vs_preset(self) -> TemplateContext:
         """
         Enforce compatible preset<->framework combinations.
-        - vision -> pytorch
-        - tabular -> sklearn
-        - nlp -> transformers
-        - minimal -> any of the enum values (no extra restriction)
+
+        - vision   -> pytorch
+        - tabular  -> sklearn
+        - nlp      -> transformers
+        - minimal  -> any of the enum values
         """
         p, f = self.preset, self.framework
         if p == Preset.vision and f != Framework.pytorch:
@@ -86,48 +88,39 @@ class TemplateContext(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _normalize_extras(self) -> "TemplateContext":
-        # normalize to a clean set of strings (defensive)
+    def _normalize_extras(self) -> TemplateContext:
+        # Normalize to a clean set of strings (defensive)
         self.extras = {str(x) for x in (self.extras or set())}
         return self
 
     # ---------- Derived flags for Jinja templates ----------
 
     def _flags(self) -> dict[str, Any]:
-        """
-        Booleans/aliases templates rely on to keep Jinja simple.
-        """
+        """Booleans/aliases templates rely on to keep Jinja simple."""
         return {
             # tracking
             "tracking_mlflow": self.tracking == Tracking.mlflow,
             "tracking_none": self.tracking == Tracking.none,
-
             # framework flags
             "framework_pytorch": self.framework == Framework.pytorch,
             "framework_sklearn": self.framework == Framework.sklearn,
             "framework_transformers": self.framework == Framework.transformers,
-
             # config
             "config_hydra": self.config_system == ConfigSystem.hydra,
             "config_plain_yaml": self.config_system == ConfigSystem.plain_yaml,
-
             # docker
             "docker_enabled": self.docker != DockerFlavor.none,
             "docker_slim": self.docker == DockerFlavor.slim,
             "docker_cuda": self.docker == DockerFlavor.cuda,
-
             # serving/ci
             "serving_enabled": self.serving,
             "ci_enabled": self.ci,
-
             # convenience
             "extras": sorted(self.extras),
         }
 
     def as_jinja(self) -> dict[str, Any]:
-        """
-        Full dict passed to templates: raw fields + derived flags.
-        """
+        """Full dict passed to templates: raw fields + derived flags."""
         d = self.model_dump()
         d.update(self._flags())
         return d
