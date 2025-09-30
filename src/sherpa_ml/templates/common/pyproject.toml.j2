@@ -13,9 +13,7 @@ authors = [{ name = "Your Name" }]
 license = { text = "{{ license }}" }
 
 {# ---- Compose dependencies safely (no trailing commas) ---- #}
-{% set deps = [
-  "rich>=13.7.1"
-] %}
+{% set deps = ["rich>=13.7.1"] %}
 {% if framework == "pytorch" %}
   {% set _ = deps.append("torch>=2.2.0") %}
 {% elif framework == "sklearn" %}
@@ -60,9 +58,6 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-{{ pkg }} = ["py.typed"]
 
 [tool.mypy]
 python_version = "3.11"
