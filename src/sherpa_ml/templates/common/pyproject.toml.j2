@@ -34,43 +34,9 @@ dependencies = [
 {% endfor %}
 ]
 
-[project.optional-dependencies]
-{# ---- Dev extras list (safe commas) ---- #}
-{% set dev = [
-  "pytest>=8.2.0",
-  "mypy>=1.11.0",
-  "ruff>=0.6.5",
-  "black>=24.8.0",
-  "types-setuptools"
-] %}
-{% if framework == "transformers" %}
-  {% set _ = dev.append("accelerate>=0.33.0") %}
-{% endif %}
-dev = [
-{% for d in dev -%}
-  "{{ d }}"{% if not loop.last %},{% endif %}
-{% endfor %}
-]
-
 [tool.setuptools]
-# Use a single table with an inline value to avoid parsing quirks on some runners
+# Single-table inline value avoids parser quirks
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.mypy]
-python_version = "3.11"
-strict = true
-exclude = ["tests/.*"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-select = ["E","F","I","N","UP","B","A","C4","DTZ","PIE","Q","RUF"]
-ignore = ["E501"]
-exclude = ["conf/**"]
-
-[tool.black]
-line-length = 100
-target-version = ["py311"]
