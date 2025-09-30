@@ -3,21 +3,43 @@ name: Smoke Bench
 on:
   workflow_dispatch:
   pull_request:
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - name: Install
+        with:
+          python-version: "3.11"
+
+      # Generate a tiny repo to smoke-test install & train
+      - name: Generate demo repo
+        run: |
+          sherpa-ml new work/demo-vision \
+            --preset {{ preset }} \
+            --framework {{ framework or 'pytorch' }} \
+            --config {{ config_system or 'hydra' }} \
+            --tracking {{ 'mlflow' if tracking_mlflow else 'none' }} \
+            --docker none \
+            --no-ci \
+            --license {{ license or 'MIT' }} \
+            --pkg {{ pkg or (repo_name | replace('-', '_')) }} \
+            --render --force
+
+      - name: Install demo (editable)
+        working-directory: work/demo-vision
         run: |
           python -m pip install -U pip
           pip install -e .[dev]
+
       - name: Train (1 epoch)
-        run: python -m {{ pkg }}.train
+        working-directory: work/demo-vision
+        run: python -m {{ (pkg or (repo_name | replace('-', '_'))) }}.train
+
       - name: Check MLflow
-        if: ${{ "{{ env.MLFLOW_TRACKING_URI != '' " }}}}
+        if: {% raw %}${{ env.MLFLOW_TRACKING_URI != '' }}{% endraw %}
         run: echo "MLflow run expected"
 {%- else -%}
 {{ SKIP_FILE }}
