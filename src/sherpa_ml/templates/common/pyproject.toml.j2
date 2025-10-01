@@ -43,15 +43,28 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  # Testing & linting
   "pytest>=7",
   "ruff>=0.5",
   "black>=24.0",
   "mypy>=1.8",
   "build>=1.2",
   "validate-pyproject>=0.14",
-  "torch",          # added
-  "torchvision",    # added
-  "torchaudio"      # added
+    
+  # Core ML frameworks
+  "torch",
+  "torchvision",
+  "torchaudio",
+
+  # Config
+  "hydra-core",
+  "omegaconf",
+
+  # Data science stack
+  "numpy",
+  "pandas",
+  "scikit-learn",
+  "matplotlib"
 ]
 
 [project.urls]
@@ -84,4 +97,5 @@ where = ["{{ packages_root | default('src') }}"]
 
 [tool.setuptools.package-data]
 "{{ import_path }}" = ["py.typed"]
+
 
