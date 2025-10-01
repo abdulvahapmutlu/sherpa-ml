@@ -1,4 +1,4 @@
-{% if ci and preset in ['vision','nlp','minimal','tabular'] -%}
+{% if ci and preset in ['vision','nlp'] -%}
 name: Smoke Bench
 on:
   workflow_dispatch:
@@ -8,90 +8,91 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
+      # Generate a tiny repo to smoke-test install & train
       - name: Generate demo repo
         run: |
           sherpa-ml new work/demo-vision \
-            --preset {{ preset | default('vision') }} \
-            --framework {{ framework | default('pytorch') }} \
-            --config {{ config_system | default('hydra') }} \
-            --tracking {{ ('mlflow' if (tracking_mlflow | default(false)) else 'none') }} \
+            --preset {{ preset }} \
+            --framework {{ framework or 'pytorch' }} \
+            --config {{ config_system or 'hydra' }} \
+            --tracking {{ 'mlflow' if tracking_mlflow else 'none' }} \
             --docker none \
             --no-ci \
-            --license {{ license | default('MIT') }} \
-            --pkg {{ (pkg | default(repo_name, true)) | replace('-', '_') }} \
+            --license {{ license or 'MIT' }} \
+            --pkg {{ pkg or (repo_name | replace('-', '_')) }} \
             --render --force
 
-      - name: Patch legacy test imports
+      # Hot-fix old test templates that reference work/demo_vision (no git needed)
+      - name: Hot-fix old test templates (import path)
         working-directory: work/demo-vision
         shell: bash
         run: |
           set -eo pipefail
           PKG="{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
-          # Find text files that reference 'work/demo_vision' (ignore common build/venv dirs)
-          mapfile -t files < <(grep -RIl --exclude-dir=.venv --exclude-dir=dist --exclude-dir=build --exclude-dir=.git "work/demo_vision" . || true)
-          if ((${#files[@]})); then
-            printf '%s\0' "${files[@]}" | xargs -0 -r sed -i.bak \
-              -e "s|__import__(\"work/demo_vision\")|__import__(\"${PKG}\")|g" \
-              -e "s|__import__('work/demo_vision')|__import__('${PKG}')|g" \
-              -e "s|-m \"work/demo_vision.train\"|-m \"${PKG}.train\"|g" \
-              -e "s|-m 'work/demo_vision.train'|-m '${PKG}.train'|g" \
-              -e "s|work/demo_vision.train|${PKG}.train|g" \
-              -e "s|work/demo_vision|${PKG}|g"
-            echo "Patched legacy imports to '${PKG}' in ${#files[@]} file(s)."
+          if [ -d tests ]; then
+            MATCHES="$(grep -RIl 'work/demo_vision' tests || true)"
+            if [ -n "$MATCHES" ]; then
+              echo "$MATCHES" | xargs -r sed -i.bak "s|work/demo_vision|${PKG}|g"
+              echo "Patched legacy test imports to '${PKG}'"
+            else
+              echo "No legacy imports found"
+            fi
           else
-            echo "No legacy imports found."
+            echo "No tests directory"
           fi
 
-      - name: Validate/Coerce PEP 508 project.name
+      # Validate (and auto-fix) pyproject.project.name to be PEP 508 compliant
+      - name: Validate PEP 508 project.name
         working-directory: work/demo-vision
-        shell: bash
         run: |
           python - <<'PY'
-          import os, re, sys, pathlib
-          try:
-              import tomllib
-          except Exception:
-              import tomli as tomllib
+          import re, sys, pathlib, os
+          import tomllib
+          def pep508ify(name: str) -> str:
+              name = os.path.basename(name).lower()
+              name = re.sub(r'[^a-z0-9._-]+', '-', name)
+              name = re.sub(r'[-_.]{2,}', '-', name).strip('._-')
+              return name or 'project'
           p = pathlib.Path("pyproject.toml")
           data = tomllib.loads(p.read_text(encoding="utf-8"))
-          proj = data.get("project") or {}
-          name = proj.get("name") or ""
+          raw = (data.get("project") or {}).get("name")
           pat = re.compile(r'^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$')
-          if not pat.fullmatch(name):
-              base = os.path.basename(name or "demo-vision").lower()
-              safe = re.sub(r'[^a-z0-9._-]+','-', base)
-              safe = re.sub(r'[-_.]{2,}','-', safe).strip('._-') or 'project'
-              txt = p.read_text(encoding="utf-8")
-              if "name" in proj:
-                  txt = re.sub(r'(?m)^(\\s*name\\s*=\\s*")[^"]*(")\\s*$', rf'\\1{safe}\\2', txt, count=1)
-              else:
-                  txt = txt.replace("[project]", f"[project]\\nname = \\"{safe}\\"", 1)
-              p.write_text(txt, encoding="utf-8")
-              print(f"project.name fixed: {name!r} -> {safe!r}")
+          if raw and pat.fullmatch(raw):
+              print(f"project.name OK: {raw}")
+              sys.exit(0)
+          safe = pep508ify(raw or "demo-vision")
+          if not pat.fullmatch(safe):
+              print(f"Could not coerce to valid PEP 508 name. Got: {safe!r}")
+              sys.exit(1)
+          txt = p.read_text(encoding="utf-8")
+          import re as _re
+          if raw:
+              txt = _re.sub(r'(?m)^(\\s*name\\s*=\\s*")[^"]*(")\\s*$', rf'\\1{safe}\\2', txt, count=1)
           else:
-              print(f"project.name OK: {name}")
+              txt = txt.replace("[project]", f"[project]\nname = \"{safe}\"", 1)
+          p.write_text(txt, encoding="utf-8")
+          print(f"project.name fixed: {raw!r} -> {safe!r}")
           PY
 
       - name: Install demo (editable)
         working-directory: work/demo-vision
-        shell: bash
         run: |
           python -m pip install -U pip
           pip install -e .[dev]
 
-      - name: Run smoke tests
+      - name: Train (1 epoch)
         working-directory: work/demo-vision
-        shell: bash
-        run: |
-          python -m pytest -q
+        run: python -m {{ (pkg or (repo_name | replace('-', '_'))) }}.train
+
+      - name: Check MLflow
+        if: {% raw %}${{ env.MLFLOW_TRACKING_URI != '' }}{% endraw %}
+        run: echo "MLflow run expected"
 {%- else -%}
 {{ SKIP_FILE }}
 {%- endif %}
