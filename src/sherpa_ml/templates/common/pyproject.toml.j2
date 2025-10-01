@@ -54,13 +54,12 @@ authors = [
 ]
 license = { text = "{{ license_name | default('MIT') }}" }
 
-{# Example dependencies; keep empty list if none #}
 dependencies = [
-  {% if project_dependencies is defined and project_dependencies %}
+  {% if project_dependencies is defined and project_dependencies -%}
     {%- for dep in project_dependencies -%}
       "{{ dep }}"{% if not loop.last %},{% endif %}
     {%- endfor -%}
-  {% endif %}
+  {%- endif %}
 ]
 
 [project.urls]
@@ -88,13 +87,8 @@ strict = true
 ignore_missing_imports = true
 exclude = ["build", "dist", ".venv"]
 
-[tool.setuptools]
-# If you need packages discovery, you can switch to find_namespace if you use src layout
-# packages = ["{{ package_import_path | default(project_name_safe | replace('-', '_')) }}"]
-
 [tool.setuptools.packages.find]
 where = ["{{ packages_root | default('src') }}"]
 
 [tool.setuptools.package-data]
 "{{ package_import_path | default(project_name_safe | replace('-', '_')) }}" = ["py.typed"]
-
