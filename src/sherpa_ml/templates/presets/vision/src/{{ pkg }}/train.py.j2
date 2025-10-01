@@ -107,7 +107,7 @@ def run_train(
         log(f"Best: epoch={best['epoch']} val_acc={best['val_acc']:.3f}")
 
 {% if config_system == "hydra" -%}
-@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+@hydra.main(version_base="1.3", config_path="../../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     train_cfg = cfg.train
     dataset_name = cfg.dataset.name
