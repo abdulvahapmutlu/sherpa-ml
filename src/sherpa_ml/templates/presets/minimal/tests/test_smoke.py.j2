@@ -1,9 +1,24 @@
-def test_smoke_import():
-    __import__("{{ pkg }}")
+import importlib
+import pathlib
+import subprocess
+import sys
 
-def test_train_script_runs(tmp_path, monkeypatch):
-    # Ensure artifacts land under project artifacts dir
-    import subprocess, sys, pathlib
-    root = pathlib.Path(__file__).resolve().parents[2]
-    proc = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
-    assert proc.returncode == 0, proc.stderr.decode()
+# Resolve to the real package name: --pkg wins; then repo_name; then project_name_pep508; fallback to demo-vision
+PKG = "{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
+
+def project_root() -> pathlib.Path:
+    # tests/ lives directly under project root
+    return pathlib.Path(__file__).resolve().parents[1]
+
+def test_smoke_import():
+    importlib.import_module(PKG)
+
+def test_train_script_runs():
+    root = project_root()
+    proc = subprocess.run(
+        [sys.executable, "-m", f"{PKG}.train"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
