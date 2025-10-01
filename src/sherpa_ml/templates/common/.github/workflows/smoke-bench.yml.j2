@@ -1,4 +1,4 @@
-{% if ci and preset in ['vision','nlp'] -%}
+{% if ci and preset in ['vision','nlp','minimal','tabular'] -%}
 name: Smoke Bench
 on:
   workflow_dispatch:
@@ -25,20 +25,29 @@ jobs:
             --docker none \
             --no-ci \
             --license {{ license or 'MIT' }} \
-            --pkg {{ pkg or (repo_name | replace('-', '_'))) }} \
+            --pkg {{ pkg or (repo_name | replace('-', '_')) }} \
             --render --force
 
-      # Hot-fix old test templates that reference work/demo_vision
-      - name: Hot-fix old test templates (import path)
+      # Patch legacy tests that reference 'work/demo_vision' (search whole repo, no git needed)
+      - name: Hot-fix legacy test imports
         working-directory: work/demo-vision
+        shell: bash
         run: |
-          # Replace legacy 'work/demo_vision' imports with the actual pkg name
-          PKG="{{ (pkg or (repo_name | replace('-', '_'))) }}"
-          if grep -RIl "work/demo_vision" tests; then
-            grep -RIl "work/demo_vision" tests | xargs sed -i.bak "s|work/demo_vision|${PKG}|g"
-            echo "Patched legacy test imports to '${PKG}'"
+          set -eo pipefail
+          PKG="{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
+          # files to scan (only text)
+          mapfile -t files < <(grep -RIl --exclude-dir .venv --exclude-dir dist --exclude-dir build "work/demo_vision" . || true)
+          if ((${#files[@]})); then
+            printf '%s\n' "${files[@]}" | xargs -r sed -i.bak \
+              -e "s|__import__(\"work/demo_vision\")|__import__(\"${PKG}\")|g" \
+              -e "s|__import__('work/demo_vision')|__import__('${PKG}')|g" \
+              -e "s|-m \"work/demo_vision.train\"|-m \"${PKG}.train\"|g" \
+              -e "s|-m 'work/demo_vision.train'|-m '${PKG}.train'|g" \
+              -e "s|work/demo_vision.train|${PKG}.train|g" \
+              -e "s|work/demo_vision|${PKG}|g"
+            echo "Patched legacy imports to '${PKG}' in ${#files[@]} file(s)."
           else
-            echo "No legacy imports found"
+            echo "No legacy imports found."
           fi
 
       # Validate (and auto-fix) pyproject.project.name to be PEP 508 compliant
@@ -46,8 +55,7 @@ jobs:
         working-directory: work/demo-vision
         run: |
           python - <<'PY'
-          import re, sys, pathlib, os
-          import tomllib
+          import re, sys, pathlib, os, tomllib
           def pep508ify(name: str) -> str:
               name = os.path.basename(name).lower()
               name = re.sub(r'[^a-z0-9._-]+', '-', name)
@@ -80,13 +88,12 @@ jobs:
           python -m pip install -U pip
           pip install -e .[dev]
 
-      - name: Train (1 epoch)
+      - name: Run smoke (vision/nlp/minimal/tabular)
         working-directory: work/demo-vision
-        run: python -m {{ (pkg or (repo_name | replace('-', '_'))) }}.train
+        run: |
+          python -m pytest -q
 
-      - name: Check MLflow
-        if: {% raw %}${{ env.MLFLOW_TRACKING_URI != '' }}{% endraw %}
-        run: echo "MLflow run expected"
 {%- else -%}
 {{ SKIP_FILE }}
 {%- endif %}
+SS
