@@ -40,7 +40,7 @@ jobs:
           set -e
           pip install -e .[dev]
 
-          # NEW: Install CPU-only PyTorch for the smoke train test
+          # Install CPU-only PyTorch so test_train_fast can import torch
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
 
           pytest -q
