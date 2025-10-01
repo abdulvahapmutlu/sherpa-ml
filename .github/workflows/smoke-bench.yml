@@ -37,11 +37,13 @@ jobs:
         working-directory: work/demo-vision
         shell: bash
         run: |
+          # Install CPU-only PyTorch so test_train_fast can import torch
+          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
+          
           set -e
           pip install -e .[dev]
 
-          # Install CPU-only PyTorch so test_train_fast can import torch
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
+
 
           pytest -q
           MOD=$(python -c "import pathlib;print(sorted(pathlib.Path('src').glob('*'))[0].name + '.train')")
