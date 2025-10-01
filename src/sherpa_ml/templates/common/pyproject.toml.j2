@@ -1,43 +1,22 @@
 {%- if project_name_pep508 is not defined or not project_name_pep508 %}
-  {# Seed from the most likely variables you already use #}
-  {%- set _seed = project_name
-        | default(repo_name)
-        | default(package_name)
-        | default('.') %}
-
-  {# Take only the last path segment #}
+  {%- set _seed = project_name | default(repo_name) | default(package_name) | default('.') %}
   {%- set _seed = _seed.split('/')[-1].split('\\')[-1] %}
-
-  {# Lowercase and map invalid chars to '-' (allowed: a-z0-9._-) #}
   {%- set _seed = _seed | lower %}
   {%- set _allowed = 'abcdefghijklmnopqrstuvwxyz0123456789._-' %}
   {%- set ns = namespace(s='') %}
   {%- for ch in _seed %}
-    {%- if ch in _allowed -%}
-      {%- set ns.s = ns.s ~ ch -%}
-    {%- else -%}
-      {%- set ns.s = ns.s ~ '-' -%}
-    {%- endif -%}
+    {%- if ch in _allowed -%}{%- set ns.s = ns.s ~ ch -%}{%- else -%}{%- set ns.s = ns.s ~ '-' -%}{%- endif -%}
   {%- endfor %}
-
-  {# Collapse repeated separators #}
-  {%- set ns.s = ns.s
-        | replace('---','-')
-        | replace('--','-') %}
-
-  {# Trim disallowed leading/trailing separators (._-) #}
+  {%- set ns.s = ns.s | replace('---','-') | replace('--','-') %}
   {%- set ns.s = ns.s.strip('._-') %}
-
-  {# Fallback if empty after sanitization #}
-  {%- if not ns.s %}
-    {%- set ns.s = 'project' %}
-  {%- endif %}
-
+  {%- if not ns.s %}{%- set ns.s = 'project' %}{%- endif %}
   {%- set project_name_safe = ns.s %}
 {%- else %}
-  {# Renderer-supplied safe name wins #}
   {%- set project_name_safe = project_name_pep508 %}
 {%- endif %}
+
+{# Import path uses underscore (src layout) #}
+{%- set import_path = package_import_path | default(project_name_safe | replace('-', '_')) %}
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
@@ -62,13 +41,23 @@ dependencies = [
   {%- endif %}
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7",
+  "ruff>=0.5",
+  "black>=24.0",
+  "mypy>=1.8",
+  "build>=1.2",
+  "validate-pyproject>=0.14",
+]
+
 [project.urls]
 Homepage = "{{ project_url | default('https://github.com/your/repo') }}"
 Repository = "{{ project_repo | default('https://github.com/your/repo') }}"
 Issues = "{{ project_issues | default('https://github.com/your/repo/issues') }}"
 
 [project.scripts]
-{{ cli_name | default(project_name_safe) }} = "{{ package_import_path | default(project_name_safe | replace('-', '_')) }}.cli:main"
+{{ cli_name | default(project_name_safe) }} = "{{ import_path }}.cli:main"
 
 [tool.black]
 line-length = 100
@@ -91,4 +80,4 @@ exclude = ["build", "dist", ".venv"]
 where = ["{{ packages_root | default('src') }}"]
 
 [tool.setuptools.package-data]
-"{{ package_import_path | default(project_name_safe | replace('-', '_')) }}" = ["py.typed"]
+"{{ import_path }}" = ["py.typed"]
