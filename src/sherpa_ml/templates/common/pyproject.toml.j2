@@ -49,6 +49,9 @@ dev = [
   "mypy>=1.8",
   "build>=1.2",
   "validate-pyproject>=0.14",
+  "torch",          # added
+  "torchvision",    # added
+  "torchaudio"      # added
 ]
 
 [project.urls]
@@ -81,3 +84,4 @@ where = ["{{ packages_root | default('src') }}"]
 
 [tool.setuptools.package-data]
 "{{ import_path }}" = ["py.typed"]
+
