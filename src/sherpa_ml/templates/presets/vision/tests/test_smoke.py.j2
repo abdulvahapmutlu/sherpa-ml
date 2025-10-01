@@ -1,9 +1,26 @@
-import subprocess, sys, pathlib
+# tests/test_smoke.py.j2 (VISION)
+
+import importlib
+import pathlib
+import subprocess
+import sys
+
+# Import path must match --pkg (defaults to repo_name with '-' -> '_')
+PKG = "{{ (pkg or (repo_name | replace('-', '_'))) }}"
+
+def project_root() -> pathlib.Path:
+    # tests/ is under project root
+    return pathlib.Path(__file__).resolve().parent.parent
 
 def test_import():
-    __import__("{{ pkg }}")
+    importlib.import_module(PKG)
 
 def test_train_fast():
-    root = pathlib.Path(__file__).resolve().parents[2]
-    proc = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
-    assert proc.returncode == 0, proc.stderr.decode()
+    root = project_root()
+    proc = subprocess.run(
+        [sys.executable, "-m", f"{PKG}.train"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
