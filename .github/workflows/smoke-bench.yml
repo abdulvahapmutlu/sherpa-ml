@@ -40,53 +40,9 @@ jobs:
           set -e
           pip install -e .[dev]
 
-          # Remove generated smoke test that tries to run training
-          rm -f tests/test_smoke.py || true
+          # NEW: Install CPU-only PyTorch for the smoke train test
+          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
 
-          # Create a minimal import-only test that auto-detects the package name
-          python - <<'PY'
-from pathlib import Path
-import textwrap
-
-tests_dir = Path('tests')
-tests_dir.mkdir(exist_ok=True)
-p = tests_dir / 'test_import_only.py'
-
-# Detect dotted package path from src/<...>
-src = Path('src')
-# find first package (__init__.py) and compute dotted path
-candidates = list(src.rglob('__init__.py'))
-if not candidates:
-    raise SystemExit("No packages found under src/")
-pkg_parts = candidates[0].parent.relative_to(src).parts
-pkg = ".".join(pkg_parts)
-
-p.write_text(textwrap.dedent(f"""
-    import importlib
-
-    def test_import():
-        importlib.import_module("{pkg}")
-"""))
-PY
-
-          # Run only the import-only test
-          pytest -q tests/test_import_only.py
-
-          # Run the train module only if torch is available
-          if python - <<'PY'
-import importlib.util, sys
-sys.exit(0 if importlib.util.find_spec("torch") else 1)
-PY
-          then
-            MOD=$(python - <<'PY'
-import pathlib
-# Derive <pkg>.train from src structure
-src = pathlib.Path('src')
-pkg = ".".join(next(src.rglob('__init__.py')).parent.relative_to(src).parts)
-print(pkg + '.train')
-PY
-)
-            python -m "$MOD"
-          else
-            echo "torch not installed; skipping train module run."
-          fi
+          pytest -q
+          MOD=$(python -c "import pathlib;print(sorted(pathlib.Path('src').glob('*'))[0].name + '.train')")
+          python -m "$MOD"
