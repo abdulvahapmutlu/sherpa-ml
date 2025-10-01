@@ -1,13 +1,42 @@
-import subprocess, sys, pathlib, json, tempfile
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+import importlib
+
+# Resolve to the real package name robustly
+PKG = "{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
+
+def project_root() -> pathlib.Path:
+    return pathlib.Path(__file__).resolve().parents[1]
+
+def test_import():
+    importlib.import_module(PKG)
 
 def test_train_and_infer():
-    root = pathlib.Path(__file__).resolve().parents[2]
-    # train
-    p1 = subprocess.run([sys.executable, "-m", "{{ pkg }}.train"], cwd=root, capture_output=True)
-    assert p1.returncode == 0, p1.stderr.decode()
-    # infer
-    rows = [{"f1":0.1,"f2":-1.2,"f3":0.7}]
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
-    tmp.write(json.dumps(rows).encode()); tmp.close()
-    p2 = subprocess.run([sys.executable, "-m", "{{ pkg }}.infer", "--json", tmp.name], cwd=root, capture_output=True)
-    assert p2.returncode == 0, p2.stderr.decode()
+    root = project_root()
+
+    # Train
+    p1 = subprocess.run(
+        [sys.executable, "-m", f"{PKG}.train"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert p1.returncode == 0, p1.stderr
+
+    # Prepare a tiny JSON payload for inference
+    rows = [{"f1": 0.1, "f2": -1.2, "f3": 0.7}]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+        tmp.write(json.dumps(rows).encode())
+        tmp_path = tmp.name
+
+    # Infer
+    p2 = subprocess.run(
+        [sys.executable, "-m", f"{PKG}.infer", "--json", tmp_path],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert p2.returncode == 0, p2.stderr
