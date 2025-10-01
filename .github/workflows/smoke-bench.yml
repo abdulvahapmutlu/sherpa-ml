@@ -40,15 +40,24 @@ jobs:
           set -e
           pip install -e .[dev]
 
-          # 🔒 Run only the import smoke test via node-id (bullet-proof)
-          if [ -f tests/test_smoke.py ]; then
-            pytest -q tests/test_smoke.py::test_import
-          else
-            # Fallback in case templates rename the test file
-            pytest -q -k "test_import"
-          fi
+          # --- Patch the generated smoke test to skip train if torch is missing ---
+          python - <<'PY'
+from pathlib import Path
+p = Path('tests/test_smoke.py')
+if p.exists():
+    s = p.read_text()
+    if 'def test_train_fast' in s and 'pytest.skip(' not in s:
+        s = s.replace(
+            'def test_train_fast():',
+            'def test_train_fast():\n    import importlib.util, pytest\n    if importlib.util.find_spec("torch") is None:\n        pytest.skip("PyTorch not installed; skipping fast train smoke test.")'
+        )
+        p.write_text(s)
+PY
+          # -----------------------------------------------------------------------
 
-          # 🛡️ Only run the train module if torch is installed
+          pytest -q
+
+          # Run the train module only if torch is available (avoid hard fail)
           if python - <<'PY'
 import importlib.util, sys
 sys.exit(0 if importlib.util.find_spec("torch") else 1)
