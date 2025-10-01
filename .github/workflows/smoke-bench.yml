@@ -36,12 +36,19 @@ jobs:
       - name: Test generated repo
         working-directory: work/demo-vision
         shell: bash
-        run: |          
+        run: |
           set -e
           pip install -e .[dev]
-
-
-
           pytest -q
-          MOD=$(python -c "import pathlib;print(sorted(pathlib.Path('src').glob('*'))[0].name + '.train')")
+          MOD=$(python - <<'PY'
+import pathlib
+src = pathlib.Path('src')
+# find a package under src that contains train.py (and has __init__.py)
+cands = [p for p in src.rglob('train.py') if (p.parent / '__init__.py').exists()]
+if not cands:
+    raise SystemExit("Could not find train.py under a package in src/")
+pkg = ".".join(cands[0].parent.relative_to(src).parts) + ".train"
+print(pkg)
+PY
+)
           python -m "$MOD"
