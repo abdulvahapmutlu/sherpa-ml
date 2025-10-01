@@ -39,9 +39,16 @@ jobs:
         run: |
           set -e
           pip install -e .[dev]
-          # Run ONLY the import smoke, avoid the train smoke entirely
-          pytest -q -k "test_import"
-          # Run the train module ONLY if torch is available
+
+          # 🔒 Run only the import smoke test via node-id (bullet-proof)
+          if [ -f tests/test_smoke.py ]; then
+            pytest -q tests/test_smoke.py::test_import
+          else
+            # Fallback in case templates rename the test file
+            pytest -q -k "test_import"
+          fi
+
+          # 🛡️ Only run the train module if torch is installed
           if python - <<'PY'
 import importlib.util, sys
 sys.exit(0 if importlib.util.find_spec("torch") else 1)
