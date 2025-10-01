@@ -1,7 +1,6 @@
 {%- if project_name_pep508 is not defined or not project_name_pep508 %}
   {%- set _seed = project_name | default(repo_name) | default(package_name) | default('.') %}
-  {%- set _seed = _seed.split('/')[-1].split('\\')[-1] %}
-  {%- set _seed = _seed | lower %}
+  {%- set _seed = _seed.split('/')[-1].split('\\')[-1] | lower %}
   {%- set _allowed = 'abcdefghijklmnopqrstuvwxyz0123456789._-' %}
   {%- set ns = namespace(s='') %}
   {%- for ch in _seed %}
@@ -15,8 +14,9 @@
   {%- set project_name_safe = project_name_pep508 %}
 {%- endif %}
 
-{# Import path uses underscore (src layout) #}
-{%- set import_path = package_import_path | default(project_name_safe | replace('-', '_')) %}
+{%- set import_path = (package_import_path
+    | default(project_name_safe, true)
+    | replace('-', '_')) %}
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
@@ -34,11 +34,11 @@ authors = [
 license = { text = "{{ license_name | default('MIT') }}" }
 
 dependencies = [
-  {% if project_dependencies is defined and project_dependencies -%}
+  {%- if project_dependencies is defined and project_dependencies -%}
     {%- for dep in project_dependencies -%}
       "{{ dep }}"{% if not loop.last %},{% endif %}
     {%- endfor -%}
-  {%- endif %}
+  {%- endif -%}
 ]
 
 [project.optional-dependencies]
