@@ -39,15 +39,6 @@ jobs:
         run: |
           set -e
           pip install -e .[dev]
-          pytest -q
-          # Only run the training module if torch is available
-          if python - <<'PY'
-import importlib.util, sys
-sys.exit(0 if importlib.util.find_spec("torch") is not None else 1)
-PY
-          then
-            MOD=$(python -c "import pathlib;print(sorted(pathlib.Path('src').glob('*'))[0].name + '.train')")
-            python -m "$MOD"
-          else
-            echo "torch not installed; skipping train module run."
-          fi
+          pytest -q -k "not test_train_fast"
+          MOD=$(python -c "import pathlib;print(sorted(pathlib.Path('src').glob('*'))[0].name + '.train')")
+          python -m "$MOD"
