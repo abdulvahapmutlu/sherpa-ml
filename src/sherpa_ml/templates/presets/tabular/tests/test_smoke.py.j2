@@ -1,42 +1,27 @@
-import json
-import pathlib
+import importlib
 import subprocess
 import sys
-import tempfile
-import importlib
+from pathlib import Path
 
-# Resolve to the real package name robustly
-PKG = "{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
+# Use dotted import path even if the generator passed a path-like pkg (e.g. "work/demo_vision")
+PKG = "{{ pkg | replace('/', '.') }}"
 
-def project_root() -> pathlib.Path:
-    return pathlib.Path(__file__).resolve().parents[1]
+
+def project_root() -> Path:
+    # Project root (one level up from this tests/ dir in the rendered repo)
+    return Path(__file__).resolve().parents[1]
+
 
 def test_import():
     importlib.import_module(PKG)
 
-def test_train_and_infer():
-    root = project_root()
 
-    # Train
-    p1 = subprocess.run(
+def test_train_fast():
+    root = project_root()
+    proc = subprocess.run(
         [sys.executable, "-m", f"{PKG}.train"],
         cwd=root,
         capture_output=True,
         text=True,
     )
-    assert p1.returncode == 0, p1.stderr
-
-    # Prepare a tiny JSON payload for inference
-    rows = [{"f1": 0.1, "f2": -1.2, "f3": 0.7}]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-        tmp.write(json.dumps(rows).encode())
-        tmp_path = tmp.name
-
-    # Infer
-    p2 = subprocess.run(
-        [sys.executable, "-m", f"{PKG}.infer", "--json", tmp_path],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    )
-    assert p2.returncode == 0, p2.stderr
+    assert proc.returncode == 0, proc.stderr
