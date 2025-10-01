@@ -36,10 +36,7 @@ jobs:
       - name: Test generated repo
         working-directory: work/demo-vision
         shell: bash
-        run: |
-          # Install CPU-only PyTorch so test_train_fast can import torch
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
-          
+        run: |          
           set -e
           pip install -e .[dev]
 
