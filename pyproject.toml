@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sherpa-ml"
-version = "0.1.2"
+version = "0.1.3"
 description = "Sherpa-ML: production-grade ML repo scaffolder with presets (vision/tabular/nlp/minimal), Hydra, MLflow, Docker, CI."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
