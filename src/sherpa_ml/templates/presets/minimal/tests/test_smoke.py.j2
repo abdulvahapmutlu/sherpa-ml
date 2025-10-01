@@ -1,19 +1,22 @@
 import importlib
-import pathlib
 import subprocess
 import sys
+from pathlib import Path
 
-# Resolve to the real package name: --pkg wins; then repo_name; then project_name_pep508; fallback to demo-vision
-PKG = "{{ (pkg | default(repo_name, true) | default(project_name_pep508, true) | default('demo-vision', true)) | replace('-', '_') }}"
+# Use dotted import path even if the generator passed a path-like pkg (e.g. "work/demo_vision")
+PKG = "{{ pkg | replace('/', '.') }}"
 
-def project_root() -> pathlib.Path:
-    # tests/ lives directly under project root
-    return pathlib.Path(__file__).resolve().parents[1]
 
-def test_smoke_import():
+def project_root() -> Path:
+    # Project root (one level up from this tests/ dir in the rendered repo)
+    return Path(__file__).resolve().parents[1]
+
+
+def test_import():
     importlib.import_module(PKG)
 
-def test_train_script_runs():
+
+def test_train_fast():
     root = project_root()
     proc = subprocess.run(
         [sys.executable, "-m", f"{PKG}.train"],
