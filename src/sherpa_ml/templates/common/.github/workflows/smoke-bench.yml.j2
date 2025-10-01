@@ -28,6 +28,55 @@ jobs:
             --pkg {{ pkg or (repo_name | replace('-', '_')) }} \
             --render --force
 
+      # Validate (and auto-fix) pyproject.project.name to be PEP 508 compliant
+      - name: Validate PEP 508 project.name
+        working-directory: work/demo-vision
+        run: |
+          python - <<'PY'
+          import re, sys, pathlib
+          import tomllib
+
+          def pep508ify(name: str) -> str:
+              import re, os
+              # Take basename if a path slipped in
+              name = os.path.basename(name)
+              name = name.lower()
+              # Map invalid chars to '-'
+              name = re.sub(r'[^a-z0-9._-]+', '-', name)
+              # Collapse duplicate separators
+              name = re.sub(r'[-_.]{2,}', '-', name)
+              # Trim leading/trailing separators
+              name = name.strip('._-')
+              return name or 'project'
+
+          p = pathlib.Path("pyproject.toml")
+          data = tomllib.loads(p.read_text(encoding="utf-8"))
+          proj = data.get("project", {})
+          raw = proj.get("name")
+
+          pat = re.compile(r'^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$')
+          if raw and pat.fullmatch(raw):
+              print(f"project.name OK: {raw}")
+              sys.exit(0)
+
+          safe = pep508ify(raw or "demo-vision")
+          if not pat.fullmatch(safe):
+              print(f"Could not coerce to valid PEP 508 name. Got: {safe!r}")
+              sys.exit(1)
+
+          # Rewrite the file with the fixed name (minimal edit)
+          txt = p.read_text(encoding="utf-8")
+          import re as _re
+          if raw:
+              txt = _re.sub(r'(?m)^(\\s*name\\s*=\\s*")[^"]*(")\\s*$',
+                            rf'\\1{safe}\\2', txt, count=1)
+          else:
+              # Insert under [project] if name was missing
+              txt = txt.replace("[project]", f"[project]\nname = \"{safe}\"", 1)
+          p.write_text(txt, encoding="utf-8")
+          print(f"project.name fixed: {raw!r} -> {safe!r}")
+          PY
+
       - name: Install demo (editable)
         working-directory: work/demo-vision
         run: |
