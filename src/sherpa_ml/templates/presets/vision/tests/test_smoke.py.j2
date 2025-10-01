@@ -1,19 +1,20 @@
-# tests/test_smoke.py.j2 (VISION)
-
 import importlib
-import pathlib
 import subprocess
 import sys
+from pathlib import Path
 
-# Import path must match --pkg (defaults to repo_name with '-' -> '_')
-PKG = "{{ (pkg or (repo_name | replace('-', '_'))) }}"
+# Use dotted import path even if the generator passed a path-like pkg (e.g. "work/demo_vision")
+PKG = "{{ pkg | replace('/', '.') }}"
 
-def project_root() -> pathlib.Path:
-    # tests/ is under project root
-    return pathlib.Path(__file__).resolve().parent.parent
+
+def project_root() -> Path:
+    # Project root (one level up from this tests/ dir in the rendered repo)
+    return Path(__file__).resolve().parents[1]
+
 
 def test_import():
     importlib.import_module(PKG)
+
 
 def test_train_fast():
     root = project_root()
