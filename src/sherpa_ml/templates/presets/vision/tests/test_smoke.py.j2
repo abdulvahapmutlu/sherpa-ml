@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-# Normalize to dotted module path even if caller passed a path-like pkg
-PKG = "{{ pkg | replace('/', '.') }}"
+# Dotted module path that matches src/work/demo_vision/*
+PKG = "work.demo_vision"
 
 
 def project_root() -> Path:
-    # Project root (one level up from this tests/ dir in the rendered repo)
+    # Project root (one level up from this tests/ dir)
     return Path(__file__).resolve().parents[1]
 
 
@@ -24,7 +24,7 @@ def test_import():
 
 
 def test_train_fast():
-    # Vision preset commonly depends on torch; skip if not available
+    # Skip if optional heavy deps (like torch) are not present in CI
     if not _has_module("torch"):
         pytest.skip("PyTorch not installed; skipping fast train smoke test.")
     root = project_root()
